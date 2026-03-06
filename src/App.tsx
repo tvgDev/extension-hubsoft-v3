@@ -73,6 +73,10 @@ function App() {
 
   const loadAppData = async (att: WlAttendance) => {
     setIsLoading(true);
+    // IMPORTANTE: Limpar dados anteriores para evitar mostrar dados do cliente anterior
+    setClientData(null);
+    setBoletos([]);
+    
     console.log('Hubsoft Extension: Carregando dados para atendimento', att.atendimentoId);
     
     try {
@@ -85,7 +89,6 @@ function App() {
       }
 
       // Lógica idêntica ao Módulo Antigo: if (noOpenWidget !== "false") { openWidget() }
-      // Isso abre se for true, undefined ou qualquer coisa DIFERENTE de "false"
       const noOpenVar = sysVars.find((attr: any) => attr.key === "noOpenWidget")?.value;
       console.log('Hubsoft Extension: Valor de noOpenWidget:', noOpenVar);
       
@@ -104,6 +107,8 @@ function App() {
       if (cpfAttrValue) {
         console.log('Hubsoft Extension: CPF encontrado, buscando na Hubsoft:', cpfAttrValue);
         await fetchHubsoftData(cpfAttrValue, sysVars);
+      } else {
+        console.log('Hubsoft Extension: CPF não encontrado para este contato.');
       }
     } catch (error) {
       console.error('Hubsoft Extension: Erro crítico em loadAppData:', error);
