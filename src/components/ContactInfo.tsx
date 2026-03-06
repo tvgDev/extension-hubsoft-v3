@@ -15,7 +15,7 @@ const ContactInfo: React.FC<ContactInfoProps> = ({ name, number, avatarUrl }) =>
       <div className="flex items-center gap-4 py-2">
         <div className="relative">
           <img 
-            src={avatarUrl || fallbackAvatar} 
+            src={(avatarUrl && avatarUrl !== 'undefined' && !avatarUrl.includes('undefined')) ? avatarUrl : fallbackAvatar} 
             alt="Foto do Contato" 
             className="w-20 h-20 rounded-2xl shadow-md border-2 border-white object-cover"
           />

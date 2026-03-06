@@ -80,18 +80,22 @@ function App() {
 
   const loadAppData = async (att: WlAttendance) => {
     setIsLoading(true);
+    console.log('Hubsoft Extension: Carregando dados para atendimento', att.atendimentoId);
     try {
-      // 1. Check if widget should open
-      const sysVars = await getSystemVariables(att.canalId);
+      // 1. Tentar buscar variáveis do sistema para verificar auto-open
+      let sysVars: any[] = [];
+      try {
+        sysVars = await getSystemVariables(att.canalId);
+      } catch (err) {
+        console.warn('Hubsoft Extension: Não foi possível carregar variáveis do sistema, usando padrão', err);
+      }
 
       // Correção: Abrir por padrão, a menos que noOpenWidget seja explicitamente "true"
-      const noOpenWidget = sysVars.find(
-        (attr: any) => attr.key === "noOpenWidget",
-      )?.value;
+      const noOpenWidget = sysVars.find((attr: any) => attr.key === "noOpenWidget")?.value;
+      console.log('Hubsoft Extension: noOpenWidget value:', noOpenWidget);
+      
       if (noOpenWidget !== "true") {
-        console.log(
-          "Hubsoft Extension: Solicitando abertura automática do widget",
-        );
+        console.log('Hubsoft Extension: Executando abertura de widget');
         wlExtensionOpenWidget();
       }
 
@@ -99,12 +103,12 @@ function App() {
       const attrs = await getContactAttributes(att.contato.id, att.canalId);
       const cpfAttr = attrs.find((a: any) => a.Key === "CPFCNPJCliente");
       const cpfAttrValue = cpfAttr?.Value;
-
+      
       if (cpfAttrValue) {
         await fetchHubsoftData(cpfAttrValue, sysVars);
       }
     } catch (error) {
-      console.error("Erro ao carregar dados do atendimento:", error);
+      console.error('Hubsoft Extension: Erro ao carregar dados do atendimento:', error);
     } finally {
       setIsLoading(false);
     }
@@ -331,18 +335,8 @@ function App() {
             type="info"
           />
           <div className="opacity-20 mt-4">
-            <svg
-              className="w-16 h-16 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.5"
-                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-              />
+            <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 10h.01M12 10h.01M16 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
         </div>
