@@ -6,7 +6,6 @@ import ClientData, { type ClientDataInfo } from "./components/ClientData";
 import Financials from "./components/Financials";
 import type { BoletoItem } from "./components/BoletoCard";
 
-import { wlExtensionOpenWidget } from "./services/wlextension";
 import {
   getSystemVariables,
   getContactAttributes,
@@ -41,10 +40,8 @@ function App() {
   const [boletos, setBoletos] = useState<BoletoItem[]>([]);
 
   useEffect(() => {
-    let initialized = false;
-
-    const initExtension = () => {
-      if (window.WlExtension && !initialized) {
+    const init = () => {
+      if (window.WlExtension) {
         console.log("Hubsoft Extension: Inicializando WlExtension...");
         window.WlExtension.initialize({
           events: {
@@ -61,18 +58,14 @@ function App() {
             },
           },
         });
-        initialized = true;
         return true;
       }
       return false;
     };
 
-    // Tenta inicializar. Se não disponível (comum em produção/iframes), tenta em intervalos
-    if (!initExtension()) {
+    if (!init()) {
       const interval = setInterval(() => {
-        if (initExtension()) {
-          clearInterval(interval);
-        }
+        if (init()) clearInterval(interval);
       }, 500);
       return () => clearInterval(interval);
     }
@@ -81,22 +74,26 @@ function App() {
   const loadAppData = async (att: WlAttendance) => {
     setIsLoading(true);
     console.log('Hubsoft Extension: Carregando dados para atendimento', att.atendimentoId);
+    
     try {
-      // 1. Tentar buscar variáveis do sistema para verificar auto-open
+      // 1. Buscar variáveis
       let sysVars: any[] = [];
       try {
         sysVars = await getSystemVariables(att.canalId);
       } catch (err) {
-        console.warn('Hubsoft Extension: Não foi possível carregar variáveis do sistema, usando padrão', err);
+        console.warn('Hubsoft Extension: Erro ao carregar variáveis do sistema', err);
       }
 
-      // Correção: Abrir por padrão, a menos que noOpenWidget seja explicitamente "true"
-      const noOpenWidget = sysVars.find((attr: any) => attr.key === "noOpenWidget")?.value;
-      console.log('Hubsoft Extension: noOpenWidget value:', noOpenWidget);
+      // Lógica idêntica ao Módulo Antigo: if (noOpenWidget !== "false") { openWidget() }
+      // Isso abre se for true, undefined ou qualquer coisa DIFERENTE de "false"
+      const noOpenVar = sysVars.find((attr: any) => attr.key === "noOpenWidget")?.value;
+      console.log('Hubsoft Extension: Valor de noOpenWidget:', noOpenVar);
       
-      if (noOpenWidget !== "true") {
-        console.log('Hubsoft Extension: Executando abertura de widget');
-        wlExtensionOpenWidget();
+      if (noOpenVar !== "false") {
+        console.log('Hubsoft Extension: Chamando openWidget (lógica antiga)');
+        if (window.WlExtension && window.WlExtension.openWidget) {
+          window.WlExtension.openWidget();
+        }
       }
 
       // 2. See if contact has CPF/CNPJ
@@ -105,10 +102,11 @@ function App() {
       const cpfAttrValue = cpfAttr?.Value;
       
       if (cpfAttrValue) {
+        console.log('Hubsoft Extension: CPF encontrado, buscando na Hubsoft:', cpfAttrValue);
         await fetchHubsoftData(cpfAttrValue, sysVars);
       }
     } catch (error) {
-      console.error('Hubsoft Extension: Erro ao carregar dados do atendimento:', error);
+      console.error('Hubsoft Extension: Erro crítico em loadAppData:', error);
     } finally {
       setIsLoading(false);
     }
