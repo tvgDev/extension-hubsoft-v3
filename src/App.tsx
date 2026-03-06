@@ -18,6 +18,7 @@ import {
   generateHubsoftToken,
   getClientData,
   getBoletosHubsoft,
+  unlockService,
 } from "./services/hubsoftApi";
 
 interface WlAttendance {
@@ -229,6 +230,57 @@ function App() {
     }
   };
 
+  const handleUnlockService = async () => {
+    if (!attendance || !clientData?.id_cliente_servico) return;
+
+    window.WlExtension?.confirmDialog({
+      title: "Confirmar desbloqueio",
+      text: "Deseja realmente realizar o desbloqueio em confiança para este serviço?",
+      callback: async (confirm) => {
+        if (confirm) {
+          setIsLoading(true);
+          try {
+            const sysVars = await getSystemVariables(attendance.canalId);
+            const urlHubsoft = sysVars.find((item: any) => item.key === "1UrlHubsoft")?.value;
+            const userHubsoft = sysVars.find((item: any) => item.key === "1UserHubsoft")?.value;
+            const passHubsoft = sysVars.find((item: any) => item.key === "1PassHubsoft")?.value;
+            const clientId = sysVars.find((item: any) => item.key === "1CliendIdHubsoft")?.value;
+            const clientSecret = sysVars.find((item: any) => item.key === "1ClientSecretHubsoft")?.value;
+
+            const tokenData = await generateHubsoftToken(urlHubsoft, clientId, clientSecret, userHubsoft, passHubsoft);
+            const token = tokenData.access_token;
+
+            const result = await unlockService(urlHubsoft, token, clientData.id_cliente_servico!);
+
+            if (result.status === "success") {
+              setClientData(prev => prev ? { ...prev, status: "ativo" } : null);
+              
+              window.WlExtension.alert({
+                message: "Serviço desbloqueado com sucesso!",
+                variant: "success"
+              });
+
+              await sendWhisper(attendance.contato.id, attendance.canalId, "Serviço desbloqueado em confiança pelo atendente.");
+            } else {
+              window.WlExtension.alert({
+                message: result.message || "Erro ao realizar desbloqueio.",
+                variant: "error"
+              });
+            }
+          } catch (error) {
+            console.error("Erro ao desbloquear serviço:", error);
+            window.WlExtension.alert({
+              message: "Erro na comunicação com o servidor.",
+              variant: "error"
+            });
+          } finally {
+            setIsLoading(false);
+          }
+        }
+      },
+    });
+  };
+
   const handleSendBoletoAction = async (
     type: "Pix" | "Código de Barras" | "PDF do Boleto",
     message: string,
@@ -313,7 +365,7 @@ function App() {
 
           {clientData ? (
             <>
-              <ClientData client={clientData} />
+              <ClientData client={clientData} onUnlock={handleUnlockService} />
               <Financials
                 boletos={boletos}
                 onSendAction={handleSendBoletoAction}

@@ -48,3 +48,18 @@ export const getBoletosHubsoft = async (apiUrl: string, token: string, idCliente
   if (!response.ok) throw new Error('Falha ao buscar faturas no Hubsoft');
   return response.json();
 };
+
+export const unlockService = async (apiUrl: string, token: string, idClienteServico: number) => {
+  const endpoint = `${apiUrl}/api/v1/integracao/cliente/servico/${idClienteServico}/desbloqueio_confianca`;
+  
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({})
+  });
+
+  return response.json();
+};
