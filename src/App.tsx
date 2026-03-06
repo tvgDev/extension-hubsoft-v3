@@ -1,0 +1,248 @@
+import { useEffect, useState } from 'react';
+import AlertMessage from './components/AlertMessage';
+import ContactInfo from './components/ContactInfo';
+import CpfCnpjForm from './components/CpfCnpjForm';
+import ClientData, { type ClientDataInfo } from './components/ClientData';
+import Financials from './components/Financials';
+import type { BoletoItem } from './components/BoletoCard';
+
+import { wlExtensionOpenWidget } from './services/wlextension';
+import { getSystemVariables, getContactAttributes, setContactAttributes, sendWhisper, sendMedia, sendText } from './services/focuschatApi';
+import { generateHubsoftToken, getClientData, getBoletosHubsoft } from './services/hubsoftApi';
+
+interface WlAttendance {
+  atendimentoId: string;
+  canalId: string;
+  contato: {
+    id: string;
+    nomeSecundario?: string;
+    numero: string;
+    linkImagem?: string;
+  };
+}
+
+function App() {
+  const [attendance, setAttendance] = useState<WlAttendance | null>(null);
+  
+  // App states
+  const [isLoading, setIsLoading] = useState(false);
+  const [clientData, setClientData] = useState<ClientDataInfo | null>(null);
+  const [boletos, setBoletos] = useState<BoletoItem[]>([]);
+
+  useEffect(() => {
+    if (window.WlExtension) {
+      window.WlExtension.initialize({
+        events: {
+          'onOpenAttendance': (att: any) => {
+            console.log(`onOpenAttendance`, att);
+            setAttendance(att);
+            loadAppData(att);
+          },
+          'onCloseAttendance': () => {
+            setAttendance(null);
+            setClientData(null);
+            setBoletos([]);
+          }
+        }
+      });
+    }
+  }, []);
+
+  const loadAppData = async (att: WlAttendance) => {
+    setIsLoading(true);
+    try {
+      // 1. Check if widget should open
+      const sysVars = await getSystemVariables(att.canalId);
+      const noOpenWidget = sysVars.find((attr: any) => attr.key === "noOpenWidget")?.value;
+      if (noOpenWidget !== "false") {
+        wlExtensionOpenWidget();
+      }
+
+      // 2. See if contact has CPF/CNPJ
+      const attrs = await getContactAttributes(att.contato.id, att.canalId);
+      const cpfAttr = attrs.find((a: any) => a.Key === "CPFCNPJCliente");
+      const cpfAttrValue = cpfAttr?.Value;
+      
+      if (cpfAttrValue) {
+        await fetchHubsoftData(cpfAttrValue, sysVars);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados do atendimento:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveCpfCnpj = async (novoValor: string) => {
+    if (!attendance) return;
+    setIsLoading(true);
+    
+    try {
+      const resp = await setContactAttributes(attendance.contato.id, attendance.canalId, [{
+        key: "CPFCNPJCliente",
+        value: novoValor,
+        description: "CPFCNPJCliente"
+      }]);
+
+      if (resp.status === "200") {
+        console.log('CPF/CNPJ salvo com sucesso!');
+        
+        // Agora busca os dados na Hubsoft usando esse novo CPF
+        const sysVars = await getSystemVariables(attendance.canalId);
+        await fetchHubsoftData(novoValor, sysVars);
+      } else {
+        console.error('Erro ao salvar CPF/CNPJ:', resp.msg);
+      }
+    } catch (error) {
+      console.error('Erro salvar o atributo CPF/CNPJ:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+  const fetchHubsoftData = async (documento: string, sysVars: any[]) => {
+    try {
+      const urlHubsoft = sysVars.find((item: any) => item.key === "1UrlHubsoft")?.value;
+      const userHubsoft = sysVars.find((item: any) => item.key === "1UserHubsoft")?.value;
+      const passHubsoft = sysVars.find((item: any) => item.key === "1PassHubsoft")?.value;
+      const clientId = sysVars.find((item: any) => item.key === "1CliendIdHubsoft")?.value;
+      const clientSecret = sysVars.find((item: any) => item.key === "1ClientSecretHubsoft")?.value;
+
+      if (!urlHubsoft || !userHubsoft || !passHubsoft || !clientId || !clientSecret) {
+        console.error('Credenciais da Hubsoft não configuradas no sistema.');
+        return;
+      }
+
+      const tokenData = await generateHubsoftToken(urlHubsoft, clientId, clientSecret, userHubsoft, passHubsoft);
+      const token = tokenData.access_token;
+
+      const clientResp = await getClientData(urlHubsoft, token, documento);
+      
+      if (clientResp.status === "success" && clientResp.clientes && clientResp.clientes.length > 0) {
+        const c = clientResp.clientes[0];
+        const servico = c.servicos[0];
+
+        const mappedData: ClientDataInfo = {
+          nome_razaosocial: c.nome_razaosocial,
+          cpf_cnpj: c.cpf_cnpj,
+          telefone_primario: c.telefone_primario,
+          email_principal: c.email_principal,
+          plano: servico?.nome,
+          status: servico?.status,
+          endereco: servico?.endereco_instalacao?.completo,
+          id_cliente_servico: servico?.id_cliente_servico
+        };
+        
+        setClientData(mappedData);
+
+        if (mappedData.id_cliente_servico) {
+          const boletoResp = await getBoletosHubsoft(urlHubsoft, token, mappedData.id_cliente_servico);
+          if (boletoResp && boletoResp.faturas) {
+            setBoletos(boletoResp.faturas);
+          }
+        }
+      } else {
+         console.warn('Cliente não encontrado na Hubsoft.');
+      }
+      
+    } catch (error) {
+      console.error('Erro de comunicação com a Hubsoft:', error);
+    }
+  };
+
+  const handleSendBoletoAction = async (type: 'Pix' | 'Código de Barras' | 'PDF do Boleto', message: string) => {
+    if (!attendance) return;
+
+    if (window.WlExtension?.confirmDialog) {
+      window.WlExtension.confirmDialog({
+        title: 'Confirmar envio',
+        text: `Deseja enviar ${type} ao cliente?`,
+        callback: async (confirm) => {
+          if (confirm) {
+            setIsLoading(true);
+            try {
+              const canalId = attendance.canalId;
+              const contatoId = attendance.contato.id;
+              let success = false;
+              let whisperMsg = '';
+
+              if (type === 'PDF do Boleto') {
+                success = await sendMedia(contatoId, canalId, message, 'Boleto em PDF', 'Boleto em PDF', '.pdf');
+                whisperMsg = `PDF do Boleto enviado ao cliente pelo sistema.`;
+              } else {
+                success = await sendText(contatoId, canalId, message);
+                if (type === 'Pix') {
+                  whisperMsg = `PIX Enviado ao cliente pelo sistema.`;
+                  // Envia também o QR Code do PIX (Baseado no index.html original)
+                  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(message)}`;
+                  await sendMedia(contatoId, canalId, qrCodeUrl, 'QRCode PIX', 'QR Code do PIX', '.png');
+                } else {
+                  whisperMsg = `Código de Barras enviado ao cliente pelo sistema.`;
+                }
+              }
+
+              if (success) {
+                await sendWhisper(contatoId, canalId, whisperMsg);
+                console.log('Conteúdo enviado com sucesso!');
+              }
+            } catch (error) {
+              console.error('Erro ao enviar conteúdo:', error);
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        }
+      });
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-[15px] bg-[#f8f9fa] min-h-screen">
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center py-12 animate-pulse">
+          <div className="w-12 h-12 border-4 border-[var(--primary)]/10 border-t-[var(--primary)] rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-400 font-medium text-sm">Sincronizando com Hubsoft...</p>
+        </div>
+      )}
+
+      {!isLoading && attendance && (
+        <div className="space-y-1 animate-fade-in">
+          <ContactInfo 
+            name={attendance.contato.nomeSecundario || 'Cliente'} 
+            number={attendance.contato.numero}
+            avatarUrl={attendance.contato.linkImagem}
+          />
+          
+          {clientData ? (
+            <>
+              <ClientData client={clientData} />
+              <Financials 
+                boletos={boletos} 
+                onSendAction={handleSendBoletoAction}
+              />
+            </>
+          ) : (
+            <>
+              <AlertMessage message="Atributo CPF ou CNPJ do cliente não encontrado. Por favor, localize-o manualmente." type="warning" />
+              <CpfCnpjForm onSubmit={saveCpfCnpj} isLoading={isLoading} />
+            </>
+          )}
+        </div>
+      )}
+
+      {!isLoading && !attendance && (
+        <div className="py-8 animate-fade-in text-center flex flex-col items-center">
+          <AlertMessage message="Você precisa abrir um atendimento ativo para sincronizar os dados do Hubsoft." type="info" />
+          <div className="opacity-20 mt-4">
+            <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+            </svg>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;

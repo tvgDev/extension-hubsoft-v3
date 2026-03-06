@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #1A2C3D;
+  --primary-light: #2c4155;
+  --secondary: #f4c20d;
+  --accent: #3b82f6;
+  --bg-main: #f0f2f5;
+  --glass: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 12px rgba(26, 44, 61, 0.08);
+  --shadow-lg: 0 10px 25px rgba(26, 44, 61, 0.12);
+  --radius: 12px;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-main);
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .info-section {
+    @apply mt-4 p-0 bg-white rounded-[var(--radius)] shadow-[var(--shadow-md)] overflow-hidden border border-white/40 transition-all duration-300;
+  }
+
+  .info-section:hover {
+    @apply shadow-[var(--shadow-lg)] -translate-y-[1px];
+  }
+
+  .section-header {
+    @apply flex justify-between items-center p-4 cursor-pointer bg-gradient-to-r from-white to-gray-50/50 border-b border-gray-100/80;
+  }
+
+  .section-header h6 {
+    @apply text-[0.95rem] font-bold text-[var(--primary)] uppercase tracking-tight m-0;
+  }
+
+  .minimize-icon {
+    @apply w-6 h-6 bg-[var(--secondary)] rounded-full inline-flex justify-center items-center text-[14px] font-bold text-white shadow-sm ring-2 ring-white transition-all duration-300;
+  }
+
+  .minimize-icon:hover {
+    @apply scale-110 shadow-md brightness-95;
+  }
+
+  .section-content {
+    @apply p-4;
+  }
+
+  .boleto-card {
+    @apply p-4 mb-3 bg-white rounded-[10px] border border-gray-100 shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-all duration-200;
+  }
+
+  .btn-icon {
+    @apply inline-flex items-center justify-center bg-gray-50/80 hover:bg-white text-[var(--primary)] p-2 rounded-lg border border-gray-100 hover:border-[var(--accent)] hover:text-[var(--accent)] shadow-sm transition-all duration-200;
+  }
+
+  .btn-icon img {
+    @apply w-5 h-5 transition-transform duration-200;
+  }
+
+  .small-text {
+    @apply text-[0.8rem] leading-relaxed;
+  }
+
+  .btn-primary {
+    @apply bg-[var(--primary)] text-white font-semibold py-3 px-6 rounded-[var(--radius)] shadow-lg hover:bg-[var(--primary-light)] hover:shadow-xl active:scale-[0.98] transition-all duration-200;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
