@@ -345,18 +345,18 @@ function App() {
   };
 
   return (
-    <div className="container mx-auto p-[15px] bg-[#f8f9fa] min-h-screen">
+    <div className="container mx-auto p-4 md:p-5 bg-[var(--bg-main)] min-h-screen">
       {isLoading && (
-        <div className="flex flex-col items-center justify-center py-12 animate-pulse">
-          <div className="w-12 h-12 border-4 border-[var(--primary)]/10 border-t-[var(--primary)] rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-400 font-medium text-sm">
+        <div className="flex flex-col items-center justify-center py-16 animate-pulse">
+          <div className="w-12 h-12 border-4 border-slate-200 border-t-[var(--primary)] rounded-full animate-spin mb-4"></div>
+          <p className="text-slate-500 font-medium text-sm">
             Sincronizando com Hubsoft...
           </p>
         </div>
       )}
 
       {!isLoading && attendance && (
-        <div className="space-y-1 animate-fade-in">
+        <div className="space-y-4 animate-fade-in pb-10">
           <ContactInfo
             name={attendance.contato.nomeSecundario || "Cliente"}
             number={attendance.contato.numero}
@@ -384,13 +384,13 @@ function App() {
       )}
 
       {!isLoading && !attendance && (
-        <div className="py-8 animate-fade-in text-center flex flex-col items-center">
+        <div className="py-12 animate-fade-in text-center flex flex-col items-center">
           <AlertMessage
             message="Você precisa abrir um atendimento ativo para sincronizar os dados do Hubsoft."
             type="info"
           />
-          <div className="opacity-20 mt-4">
-            <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="opacity-10 mt-6 text-slate-400">
+            <svg className="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 10h.01M12 10h.01M16 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>

@@ -8,9 +8,9 @@ interface AlertMessageProps {
 const AlertMessage: React.FC<AlertMessageProps> = ({ message, type = 'warning' }) => {
   const getColors = () => {
     switch (type) {
-      case 'error': return 'bg-red-50 text-red-700 border-red-100';
-      case 'info': return 'bg-blue-50 text-blue-700 border-blue-100';
-      default: return 'bg-amber-50 text-amber-700 border-amber-100';
+      case 'error': return 'bg-rose-50 text-rose-700 border-rose-200 shadow-rose-100/50';
+      case 'info': return 'bg-blue-50 text-blue-700 border-blue-200 shadow-blue-100/50';
+      default: return 'bg-amber-50 text-amber-700 border-amber-200 shadow-amber-100/50';
     }
   };
 
@@ -38,12 +38,12 @@ const AlertMessage: React.FC<AlertMessageProps> = ({ message, type = 'warning' }
   };
 
   return (
-    <div className={`p-4 rounded-[var(--radius)] border shadow-sm animate-fade-in mb-4 ${getColors()}`}>
-      <div className="flex items-center gap-3">
-        <div className="flex-shrink-0 opacity-80">
+    <div className={`p-4 rounded-xl border shadow-sm animate-fade-in mb-4 ${getColors()}`}>
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 opacity-80 mt-0.5">
           {getIcon()}
         </div>
-        <p className="text-sm font-medium leading-tight">{message}</p>
+        <p className="text-[13px] font-medium leading-relaxed">{message}</p>
       </div>
     </div>
   );
