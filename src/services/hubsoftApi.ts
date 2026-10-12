@@ -1,65 +1,70 @@
-// src/services/hubsoftApi.ts
+import type { HubsoftCredentials } from "../model";
+import { requestJson } from "./http";
 
-export const generateHubsoftToken = async (
-  apiUrl: string,
-  clientId: string,
-  clientSecret: string,
-  user: string,
-  pass: string
-) => {
-  const payload = {
-    grant_type: 'password',
-    client_id: clientId,
-    client_secret: clientSecret,
-    username: user,
-    password: pass
-  };
+// Formatos devolvidos pela API de integração do Hubsoft (só o que o módulo usa).
+export interface RawService {
+  nome?: string;
+  status?: string;
+  endereco_instalacao?: { completo?: string };
+  id_cliente_servico?: number;
+}
 
-  const response = await fetch(`${apiUrl}/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+export interface RawClient {
+  nome_razaosocial: string;
+  cpf_cnpj: string;
+  telefone_primario: string;
+  email_principal: string;
+  servicos?: RawService[];
+}
 
-  if (!response.ok) throw new Error('Falha ao autenticar na API do Hubsoft');
-  return response.json();
-};
+export interface RawInvoice {
+  id?: string | number;
+  data_vencimento: string;
+  valor: number;
+  status: string;
+  linha_digitavel?: string;
+  pix_copia_cola?: string;
+  link?: string;
+  data_pagamento?: string;
+  detalhamento?: Array<{ descricao: string; valor: number }>;
+}
 
-export const getClientData = async (apiUrl: string, token: string, cpfCnpj: string) => {
-  const endpoint = `${apiUrl}/api/v1/integracao/cliente?limit=1&cancelado=nao&order_by=data_cadastro&order_type=asc&busca=cpf_cnpj&termo_busca=${cpfCnpj}`;
-  
-  const response = await fetch(endpoint, {
-    method: 'GET',
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
+const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
-  if (!response.ok) throw new Error('Falha ao buscar dados do cliente no Hubsoft');
-  return response.json();
-};
-
-export const getBoletosHubsoft = async (apiUrl: string, token: string, idClienteServico: number) => {
-  const endpoint = `${apiUrl}/api/v1/integracao/cliente/financeiro?busca=id_cliente_servico&termo_busca=${idClienteServico}&limit=5&apenas_pendente=sim&order_by=data_vencimento&order_type=asc`;
-  
-  const response = await fetch(endpoint, {
-    method: 'GET',
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-
-  if (!response.ok) throw new Error('Falha ao buscar faturas no Hubsoft');
-  return response.json();
-};
-
-export const unlockService = async (apiUrl: string, token: string, idClienteServico: number) => {
-  const endpoint = `${apiUrl}/api/v1/integracao/cliente/servico/${idClienteServico}/desbloqueio_confianca`;
-  
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+export const generateToken = (credentials: HubsoftCredentials) =>
+  requestJson<{ access_token: string }>(
+    `${credentials.url}/oauth/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "password",
+        client_id: credentials.clientId,
+        client_secret: credentials.clientSecret,
+        username: credentials.user,
+        password: credentials.password,
+      }),
     },
-    body: JSON.stringify({})
-  });
+    "Não foi possível entrar no Hubsoft. Confira os dados de acesso nas variáveis do sistema",
+  );
 
-  return response.json();
-};
+export const findClient = (url: string, token: string, document: string) =>
+  requestJson<{ status?: string; clientes?: RawClient[] }>(
+    `${url}/api/v1/integracao/cliente?limit=1&cancelado=nao&order_by=data_cadastro&order_type=asc&busca=cpf_cnpj&termo_busca=${encodeURIComponent(document)}`,
+    { headers: bearer(token) },
+    "Não foi possível buscar o cliente no Hubsoft",
+  );
+
+export const listPendingInvoices = (url: string, token: string, serviceId: number) =>
+  requestJson<{ faturas?: RawInvoice[] }>(
+    `${url}/api/v1/integracao/cliente/financeiro?busca=id_cliente_servico&termo_busca=${serviceId}&limit=5&apenas_pendente=sim&order_by=data_vencimento&order_type=asc`,
+    { headers: bearer(token) },
+    "Não foi possível buscar as faturas no Hubsoft",
+  );
+
+export const unlockService = (url: string, token: string, serviceId: number) =>
+  requestJson<{ status?: string; message?: string }>(
+    `${url}/api/v1/integracao/cliente/servico/${serviceId}/desbloqueio_confianca`,
+    { method: "POST", headers: { ...bearer(token), "Content-Type": "application/json" }, body: "{}" },
+    "Não foi possível desbloquear o serviço no Hubsoft",
+  );

@@ -1,73 +1,43 @@
-# React + TypeScript + Vite
+# Extensão Hubsoft · FOCUS Chat
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Widget de atendimento do FOCUS Chat. Ao abrir uma conversa, mostra o cadastro do
+cliente no Hubsoft e as faturas em aberto, com envio de PIX, linha digitável e
+PDF direto na conversa e desbloqueio em confiança.
 
-Currently, two official plugins are available:
+Interface em React 19 + MUI 9, no padrão visual do painel do FOCUS Chat (faixa
+azul-marinho, cartão branco com abas, seções recolhíveis).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Rodar
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # gera dist/
+npm run lint
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Fora do painel a tela fica em "aguardando atendimento": o módulo depende do
+`WlExtension` (script `wlclient` carregado no `index.html`) para receber o
+atendimento aberto.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Configuração no FOCUS Chat
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Variáveis do sistema:
+
+| Variável | Uso |
+| --- | --- |
+| `1UrlHubsoft` | URL base da API do Hubsoft (sem barra no final) |
+| `1UserHubsoft` / `1PassHubsoft` | usuário e senha do Hubsoft |
+| `1CliendIdHubsoft` / `1ClientSecretHubsoft` | credenciais OAuth da integração |
+| `noOpenWidget` | `"false"` para o widget não abrir sozinho ao entrar no atendimento |
+
+O CPF/CNPJ do cliente fica no atributo `CPFCNPJCliente` do contato. Quando o
+contato ainda não tem o atributo, o atendente informa o documento na aba
+Cliente e o módulo grava para as próximas conversas.
+
+## Estrutura
+
+- `src/components/` — casca do painel (`PageShell`, `Section`, `OutlinedCard`), feedback (`useNotify`, `useConfirm`) e `useLoad`.
+- `src/pages/` — `Welcome` (sem atendimento), `Home` (abas), `ClientTab`, `FinanceTab`.
+- `src/services/` — `focuschatApi` e `hubsoftApi` (chamadas), `attendance` (regras: carregar, localizar, desbloquear, enviar).
+- `src/theme.ts` — cores e medidas do painel.

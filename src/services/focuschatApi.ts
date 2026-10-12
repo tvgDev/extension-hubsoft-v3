@@ -1,125 +1,76 @@
-// src/services/focuschatApi.ts
+import type { ContactAttribute, SystemVariable } from "../model";
+import { ApiError, requestJson } from "./http";
 
-const API_BASE = 'https://api.focuschat.com.br/core/v2/api';
+const API_BASE = "https://api.focuschat.com.br/core/v2/api";
 
-export const getSystemVariables = async (canalId: string) => {
-  const headers = new Headers({
-    'access-token': canalId,
-    'Content-Type': 'application/json'
-  });
+// O token de acesso da API é o id do canal do atendimento.
+const headers = (canalId: string) => ({ "access-token": canalId, "Content-Type": "application/json" });
 
-  const response = await fetch(`${API_BASE}/system/variables`, {
-    method: 'GET',
-    headers
-  });
-  
-  if (!response.ok) throw new Error('Não foi possível carregar as variáveis do sistema');
-  return response.json();
-};
+export const getSystemVariables = (canalId: string) =>
+  requestJson<SystemVariable[]>(`${API_BASE}/system/variables`, { headers: headers(canalId) }, "Não foi possível carregar as variáveis do sistema");
 
-export const getContactAttributes = async (contatoId: string, canalId: string) => {
-  const headers = new Headers({
-    'access-token': canalId,
-    'Content-Type': 'application/json'
-  });
+export const getContactAttributes = (contatoId: string, canalId: string) =>
+  requestJson<ContactAttribute[]>(
+    `${API_BASE}/contacts/${contatoId}/get-attributes/`,
+    { headers: headers(canalId) },
+    "Não foi possível ler os dados do contato",
+  );
 
-  const response = await fetch(`${API_BASE}/contacts/${contatoId}/get-attributes/`, {
-    method: 'GET',
-    headers
-  });
+export async function setContactAttributes(
+  contatoId: string,
+  canalId: string,
+  attributes: Array<{ key: string; value: string; description: string }>,
+): Promise<void> {
+  const failure = "Não foi possível gravar o documento no contato";
+  const result = await requestJson<{ status?: string | number; msg?: string } | null>(
+    `${API_BASE}/contacts/${contatoId}/set-attributes`,
+    { method: "POST", headers: headers(canalId), body: JSON.stringify(attributes) },
+    failure,
+  );
+  if (String(result?.status) !== "200") {
+    throw new ApiError(0, result?.msg ? `${failure}: ${result.msg}` : `${failure}.`);
+  }
+}
 
-  if (!response.ok) throw new Error('Falha ao buscar atributos do contato');
-  return response.json();
-};
+/** Mensagem na conversa; com `isWhisper` vira nota interna (o cliente não vê). */
+export const sendText = (contatoId: string, canalId: string, message: string, isWhisper = false) =>
+  requestJson<unknown>(
+    `${API_BASE}/chats/send-text`,
+    {
+      method: "POST",
+      headers: headers(canalId),
+      body: JSON.stringify({
+        contactId: contatoId,
+        message,
+        isWhisper,
+        forceSend: true,
+        verifyContact: false,
+        delayInSeconds: 0,
+        linkPreview: !isWhisper,
+      }),
+    },
+    isWhisper ? "Não foi possível registrar a nota interna" : "Não foi possível enviar a mensagem",
+  );
 
-export const setContactAttributes = async (contatoId: string, canalId: string, attributes: Array<{key: string, value: string, description: string}>) => {
-  const headers = new Headers({
-    'access-token': canalId,
-    'Content-Type': 'application/json'
-  });
+export const sendWhisper = (contatoId: string, canalId: string, message: string) => sendText(contatoId, canalId, message, true);
 
-  const response = await fetch(`${API_BASE}/contacts/${contatoId}/set-attributes`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(attributes)
-  });
-
-  return response.json();
-};
-
-export const sendWhisper = async (contatoId: string, canalId: string, message: string) => {
-  const headers = new Headers({
-    'access-token': canalId,
-    'Content-Type': 'application/json'
-  });
-
-  const payload = {
-    contactId: contatoId,
-    message: message,
-    isWhisper: true,
-    forceSend: true,
-    verifyContact: false,
-    delayInSeconds: 0,
-    linkPreview: false
-  };
-
-  const response = await fetch(`${API_BASE}/chats/send-text`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload)
-  });
-
-  return response.json();
-};
-
-export const sendMedia = async (contatoId: string, canalId: string, mediaUrl: string, fileName: string, caption: string, extension: string) => {
-  const headers = new Headers({
-    'access-token': canalId,
-    'Content-Type': 'application/json'
-  });
-
-  const payload = {
-    contactId: contatoId,
-    forceSend: true,
-    verifyContact: false,
-    linkUrl: mediaUrl,
-    extension,
-    fileName,
-    caption,
-    delayInSeconds: 0,
-    isWhisper: false
-  };
-
-  const response = await fetch(`${API_BASE}/chats/send-media`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload)
-  });
-
-  return response.ok;
-};
-
-export const sendText = async (contatoId: string, canalId: string, message: string) => {
-  const headers = new Headers({
-    'access-token': canalId,
-    'Content-Type': 'application/json'
-  });
-
-  const payload = {
-    contactId: contatoId,
-    message: message,
-    isWhisper: false,
-    forceSend: true,
-    verifyContact: false,
-    delayInSeconds: 0,
-    linkPreview: true
-  };
-
-  const response = await fetch(`${API_BASE}/chats/send-text`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload)
-  });
-
-  return response.ok;
-};
+export const sendMedia = (contatoId: string, canalId: string, media: { url: string; fileName: string; caption: string; extension: string }) =>
+  requestJson<unknown>(
+    `${API_BASE}/chats/send-media`,
+    {
+      method: "POST",
+      headers: headers(canalId),
+      body: JSON.stringify({
+        contactId: contatoId,
+        forceSend: true,
+        verifyContact: false,
+        linkUrl: media.url,
+        extension: media.extension,
+        fileName: media.fileName,
+        caption: media.caption,
+        delayInSeconds: 0,
+        isWhisper: false,
+      }),
+    },
+    "Não foi possível enviar o arquivo na conversa",
+  );
