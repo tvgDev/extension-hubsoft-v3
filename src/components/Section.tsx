@@ -11,16 +11,23 @@ interface Props {
   /** Texto de apoio à direita do título (ex.: situação do serviço). */
   aside?: ReactNode;
   defaultOpen?: boolean;
+  /** Só monta o conteúdo quando a seção é aberta pela primeira vez (evita chamadas à API à toa). */
+  lazy?: boolean;
   children: ReactNode;
 }
 
 /** Seção recolhível no mesmo formato das telas do FOCUS Chat: título, seta e linha. */
-export function Section({ title, aside, defaultOpen = true, children }: Props) {
+export function Section({ title, aside, defaultOpen = true, lazy = false, children }: Props) {
   const [open, setOpen] = useState(defaultOpen);
+  const [opened, setOpened] = useState(defaultOpen);
+  const toggle = () => {
+    setOpen((value) => !value);
+    setOpened(true);
+  };
   return (
     <Box component="section">
       <Box
-        onClick={() => setOpen((value) => !value)}
+        onClick={toggle}
         sx={{
           display: "flex",
           alignItems: "center",
@@ -36,13 +43,13 @@ export function Section({ title, aside, defaultOpen = true, children }: Props) {
         <Typography component="h2" sx={{ fontSize: "1.0625rem", flexGrow: 1 }}>
           {title}
         </Typography>
-        {aside}
+        {aside && <Box onClick={(event) => event.stopPropagation()}>{aside}</Box>}
         <IconButton size="small" aria-label={open ? `Recolher ${title}` : `Expandir ${title}`} sx={{ color: "primary.main", mr: -0.5 }}>
           {open ? <ExpandLess /> : <ExpandMore />}
         </IconButton>
       </Box>
       <Collapse in={open}>
-        <Box sx={{ pt: 3, pb: 1 }}>{children}</Box>
+        <Box sx={{ pt: 3, pb: 1 }}>{(!lazy || opened) && children}</Box>
       </Collapse>
     </Box>
   );

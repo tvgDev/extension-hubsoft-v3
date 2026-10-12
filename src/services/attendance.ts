@@ -1,6 +1,7 @@
 import type { AttendanceData, HubsoftClient, HubsoftCredentials, Invoice, SystemVariable, WlAttendance } from "../model";
 import { getContactAttributes, getSystemVariables, sendMedia, sendText, sendWhisper, setContactAttributes } from "./focuschatApi";
-import { findClient, generateToken, listPendingInvoices, unlockService, type RawClient, type RawInvoice } from "./hubsoftApi";
+import { HubsoftApi } from "./hubsoftApi";
+import { toClient, toInvoice } from "./mappers";
 
 /** Atributo do contato (FOCUS Chat) que guarda o CPF/CNPJ do cliente. */
 export const DOCUMENT_ATTRIBUTE = "CPFCNPJCliente";
@@ -26,43 +27,25 @@ function readCredentials(variables: SystemVariable[]): HubsoftCredentials | null
   return Object.values(credentials).every(Boolean) ? credentials : null;
 }
 
-const toClient = (raw: RawClient): HubsoftClient => {
-  const service = raw.servicos?.[0];
-  return {
-    name: raw.nome_razaosocial,
-    document: raw.cpf_cnpj,
-    phone: raw.telefone_primario,
-    email: raw.email_principal,
-    plan: service?.nome ?? null,
-    status: service?.status ?? null,
-    address: service?.endereco_instalacao?.completo ?? null,
-    serviceId: service?.id_cliente_servico ?? null,
-  };
-};
+export interface Lookup {
+  client: HubsoftClient | null;
+  invoices: Invoice[];
+  openTickets: number;
+}
 
-const toInvoice = (raw: RawInvoice, index: number): Invoice => ({
-  id: raw.id !== undefined && raw.id !== null ? String(raw.id) : `fatura-${index}`,
-  dueDate: raw.data_vencimento,
-  value: Number(raw.valor) || 0,
-  status: raw.status ?? "",
-  pix: raw.pix_copia_cola || null,
-  barcode: raw.linha_digitavel || null,
-  pdfUrl: raw.link || null,
-  paidAt: raw.data_pagamento || null,
-  lines: (raw.detalhamento ?? []).map((line) => ({ description: line.descricao, value: Number(line.valor) || 0 })),
-});
-
-/** Busca o cliente pelo CPF/CNPJ e as faturas em aberto do primeiro serviço. */
-export async function lookupClient(credentials: HubsoftCredentials, document: string): Promise<{ client: HubsoftClient | null; invoices: Invoice[] }> {
-  const { access_token: token } = await generateToken(credentials);
-  const found = await findClient(credentials.url, token, document);
+/** Busca o cliente pelo CPF/CNPJ, as faturas em aberto e quantos chamados estão abertos. */
+export async function lookupClient(api: HubsoftApi, document: string): Promise<Lookup> {
+  const found = await api.findClient(document);
   const raw = found.clientes?.[0];
-  if (found.status !== "success" || !raw) return { client: null, invoices: [] };
+  if (!raw) return { client: null, invoices: [], openTickets: 0 };
 
   const client = toClient(raw);
-  if (client.serviceId === null) return { client, invoices: [] };
-  const result = await listPendingInvoices(credentials.url, token, client.serviceId);
-  return { client, invoices: (result.faturas ?? []).map(toInvoice) };
+  const [invoices, openTickets] = await Promise.all([
+    api.listInvoices(client.document, true, 50).then((result) => (result.faturas ?? []).map(toInvoice)),
+    // Só alimenta o contador da aba; se falhar, a aba Chamados mostra o erro ao abrir.
+    api.listTickets(client.document, true).then((result) => (result.atendimentos ?? []).length).catch(() => 0),
+  ]);
+  return { client, invoices, openTickets };
 }
 
 /** Carrega tudo que o módulo mostra ao abrir um atendimento. */
@@ -79,11 +62,11 @@ export async function loadAttendance(attendance: WlAttendance): Promise<Attendan
   const attributes = await getContactAttributes(attendance.contato.id, attendance.canalId);
   const document = attributes.find((item) => item.Key === DOCUMENT_ATTRIBUTE)?.Value?.trim() || null;
 
-  const base: AttendanceData = { credentials, document, client: null, invoices: [], reason: null };
+  const base: AttendanceData = { credentials, document, client: null, invoices: [], openTickets: 0, reason: null };
   if (!credentials) return { ...base, reason: "sem-credenciais" };
   if (!document) return { ...base, reason: "sem-documento" };
 
-  const found = await lookupClient(credentials, document);
+  const found = await lookupClient(new HubsoftApi(credentials), document);
   return { ...base, ...found, reason: found.client ? null : "nao-encontrado" };
 }
 
@@ -91,15 +74,11 @@ export async function loadAttendance(attendance: WlAttendance): Promise<Attendan
 export const saveDocument = (attendance: WlAttendance, document: string) =>
   setContactAttributes(attendance.contato.id, attendance.canalId, [{ key: DOCUMENT_ATTRIBUTE, value: document, description: DOCUMENT_ATTRIBUTE }]);
 
-/** Desbloqueio em confiança no Hubsoft e nota interna no atendimento. */
-export async function unlockInTrust(attendance: WlAttendance, credentials: HubsoftCredentials, serviceId: number): Promise<void> {
-  const { access_token: token } = await generateToken(credentials);
-  const result = await unlockService(credentials.url, token, serviceId);
-  if (result.status !== "success") {
-    throw new Error(result.message || "O Hubsoft não aceitou o desbloqueio. Confira a situação do serviço.");
-  }
-  await sendWhisper(attendance.contato.id, attendance.canalId, "Serviço desbloqueado em confiança pelo atendente.");
-}
+/** Nota interna no atendimento do FOCUS Chat (o cliente não vê). */
+export const addNote = (attendance: WlAttendance, note: string) => sendWhisper(attendance.contato.id, attendance.canalId, note);
+
+/** Mensagem para o cliente na conversa. */
+export const sendToContact = (attendance: WlAttendance, message: string) => sendText(attendance.contato.id, attendance.canalId, message);
 
 export type InvoiceItem = "pix" | "barcode" | "pdf";
 

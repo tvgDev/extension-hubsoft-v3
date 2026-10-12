@@ -28,9 +28,10 @@ export async function requestJson<T>(url: string, init: RequestInit, failure: st
     // resposta não-JSON: cai no tratamento abaixo
   }
   if (!response.ok) {
-    const detail = data as { message?: string; msg?: string; error?: string } | null;
-    const reason = detail?.message ?? detail?.msg ?? detail?.error;
-    throw new ApiError(response.status, reason ? `${failure}: ${reason}` : `${failure} (erro ${response.status}).`);
+    const detail = data as { message?: string; msg?: string; error?: string; retry_after?: number } | null;
+    const reason = detail?.msg ?? detail?.message ?? detail?.error;
+    const wait = response.status === 429 && detail?.retry_after ? ` Aguarde ${detail.retry_after}s e tente de novo.` : "";
+    throw new ApiError(response.status, (reason ? `${failure}: ${reason}` : `${failure} (erro ${response.status}).`) + wait);
   }
   return data as T;
 }

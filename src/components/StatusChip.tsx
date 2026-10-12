@@ -1,9 +1,8 @@
 import Chip from "@mui/material/Chip";
-import { invoiceStatusColor, serviceStatusColor, statusLabel } from "../status";
+import { statusColor, statusLabel, type StatusKind } from "../status";
 
-/** Chip pequeno de situação, nas cores do painel (verde ativo, âmbar pendência). */
-export function StatusChip({ kind, status }: { kind: "service" | "invoice"; status: string | null }) {
-  if (!status) return <Chip size="small" label="Sem situação" />;
-  const color = kind === "service" ? serviceStatusColor(status) : invoiceStatusColor(status);
-  return <Chip size="small" color={color} label={statusLabel(status)} />;
+/** Chip pequeno de situação, nas cores do painel (verde ok, âmbar pendência, vermelho problema). */
+export function StatusChip({ kind, status, label }: { kind: StatusKind; status: string | null; label?: string }) {
+  if (!status) return <Chip size="small" label={label ?? "Sem situação"} />;
+  return <Chip size="small" color={statusColor(kind, status)} label={label ?? statusLabel(status)} />;
 }
