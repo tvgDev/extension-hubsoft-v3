@@ -22,6 +22,7 @@ import Typography from "@mui/material/Typography";
 import { useState, type ReactNode } from "react";
 import { useAttendance } from "../attendance";
 import { EmptyState, LoadState, TabIntro } from "../components/common";
+import { content, contentTop } from "../components/layout";
 import { OutlinedCard } from "../components/OutlinedCard";
 import { Section } from "../components/Section";
 import { StatusChip } from "../components/StatusChip";
@@ -65,7 +66,7 @@ export function FinanceTab() {
   const client = data.client;
   if (!client || !api) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: { xs: 2, md: 3 } }}>
         <EmptyState title="Nenhum cliente localizado">Localize o cliente na aba Cliente para ver as faturas.</EmptyState>
       </Box>
     );
@@ -109,8 +110,8 @@ export function FinanceTab() {
   const cardProps = { sending, onSend: send, onHubsoft: sendByHubsoft };
 
   return (
-    <Box sx={{ px: 3, pb: 4 }}>
-      <Box sx={{ pt: 3 }}>
+    <Box sx={content}>
+      <Box sx={contentTop}>
         <TabIntro
           action={
             <ToggleButtonGroup size="small" exclusive value={view} onChange={(_event, value: "abertas" | "historico" | null) => value && setView(value)}>
@@ -119,14 +120,16 @@ export function FinanceTab() {
             </ToggleButtonGroup>
           }
         >
-          Faturas de {client.name} no Hubsoft. Envie o PIX, a linha digitável ou o PDF direto na conversa, ou peça ao Hubsoft para mandar por e-mail ou SMS.
+          Faturas de {client.name}. Envie o PIX ou o boleto na conversa, ou peça ao Hubsoft para mandar por e-mail ou SMS.
         </TabIntro>
 
         {view === "abertas" && <InvoiceList invoices={data.invoices} emptyTitle="Nenhuma fatura em aberto" emptyText="O cliente está em dia no Hubsoft." {...cardProps} />}
         {view === "historico" && <InvoiceHistory api={api} document={client.document} {...cardProps} />}
       </Box>
 
-      <FiscalNotesSection api={api} clientId={client.id} />
+      <Section title="Notas fiscais" defaultOpen={false} lazy>
+        <FiscalNotes api={api} clientId={client.id} />
+      </Section>
     </Box>
   );
 }
@@ -160,26 +163,28 @@ function InvoiceHistory({ api, document, ...actions }: { api: HubsoftApi; docume
 
 function InvoiceCard({ invoice, sending, onSend, onHubsoft }: { invoice: Invoice } & CardActions) {
   const busy = sending !== null;
-  const button = (item: InvoiceItem, icon: ReactNode, label: string, variant: "contained" | "outlined") => (
-    <Button variant={variant} startIcon={icon} fullWidth disabled={busy} onClick={() => void onSend(item, invoice)}>
-      {sending === `${invoice.id}:${item}` ? "Enviando…" : label}
-    </Button>
-  );
+  const options: Array<{ item: InvoiceItem; icon: ReactNode; label: string }> = [
+    ...(invoice.pix ? [{ item: "pix" as const, icon: <Pix />, label: "Enviar PIX" }] : []),
+    ...(invoice.barcode ? [{ item: "barcode" as const, icon: <ReceiptLong />, label: "Linha digitável" }] : []),
+    ...(invoice.pdfUrl ? [{ item: "pdf" as const, icon: <PictureAsPdf />, label: "PDF do boleto" }] : []),
+  ];
+  // A primeira opção disponível vira o botão grande; as outras ficam pequenas embaixo.
+  const [primary, ...secondary] = options;
+  const sendingLabel = (key: string, label: string) => (sending === `${invoice.id}:${key}` ? "Enviando…" : label);
 
   return (
     <OutlinedCard title={`Vencimento ${invoice.dueDate}`} aside={<StatusChip kind="invoice" status={invoice.status} />}>
-      <Typography sx={{ fontSize: "1.5rem", fontWeight: 700, color: "primary.main", lineHeight: 1.2 }}>{formatMoney(invoice.value)}</Typography>
-      {invoice.serviceName && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          {invoice.serviceName}
-        </Typography>
-      )}
+      <Stack direction="row" spacing={2} sx={{ alignItems: "baseline", flexWrap: "wrap" }}>
+        <Typography sx={{ fontSize: "1.5rem", fontWeight: 700, color: "primary.main", lineHeight: 1.2 }}>{formatMoney(invoice.value)}</Typography>
+        {invoice.serviceName && (
+          <Typography variant="body2" color="text.secondary">
+            {invoice.serviceName}
+          </Typography>
+        )}
+      </Stack>
 
       {invoice.lines.length > 0 && (
-        <Box sx={{ mt: 2, pt: 1.5, borderTop: 1, borderColor: "divider" }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-            Detalhamento
-          </Typography>
+        <Box sx={{ mt: 1.5, pt: 1.5, borderTop: 1, borderColor: "divider" }}>
           {invoice.lines.map((line, index) => (
             <Stack key={index} direction="row" spacing={2} sx={{ justifyContent: "space-between" }}>
               <Typography variant="body2" color="text.secondary">
@@ -202,36 +207,35 @@ function InvoiceCard({ invoice, sending, onSend, onHubsoft }: { invoice: Invoice
           </Typography>
         </Stack>
       ) : (
-        <>
-          <Stack spacing={1.5} sx={{ mt: 3 }}>
-            {invoice.pix && button("pix", <Pix />, "Enviar PIX", "contained")}
-            {invoice.barcode && button("barcode", <ReceiptLong />, "Enviar linha digitável", "outlined")}
-            {invoice.pdfUrl && button("pdf", <PictureAsPdf />, "Enviar PDF do boleto", "outlined")}
-            {!invoice.pix && !invoice.barcode && !invoice.pdfUrl && (
-              <Typography variant="body2" color="text.secondary">
-                O Hubsoft não devolveu PIX, linha digitável nem PDF para esta fatura.
-              </Typography>
-            )}
-          </Stack>
-          <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", mt: 1.5 }}>
+        <Box sx={{ mt: 2.5 }}>
+          {primary ? (
+            <Button variant="contained" size="large" fullWidth startIcon={primary.icon} disabled={busy} onClick={() => void onSend(primary.item, invoice)}>
+              {sendingLabel(primary.item, primary.item === "pix" ? "Enviar PIX" : `Enviar ${primary.label.toLowerCase()}`)}
+            </Button>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              O Hubsoft não devolveu PIX, linha digitável nem PDF para esta fatura.
+            </Typography>
+          )}
+          <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: "wrap", mt: 1, ml: -1 }}>
+            {secondary.map((option) => (
+              <Button key={option.item} size="small" startIcon={option.icon} sx={{ textTransform: "none" }} disabled={busy} onClick={() => void onSend(option.item, invoice)}>
+                {sendingLabel(option.item, option.label)}
+              </Button>
+            ))}
             <Button size="small" startIcon={<Email />} sx={{ textTransform: "none" }} disabled={busy} onClick={() => void onHubsoft("email", invoice)}>
-              {sending === `${invoice.id}:email` ? "Enviando…" : "Enviar por e-mail"}
+              {sendingLabel("email", "E-mail")}
             </Button>
             <Button size="small" startIcon={<Sms />} sx={{ textTransform: "none" }} disabled={busy} onClick={() => void onHubsoft("sms", invoice)}>
-              {sending === `${invoice.id}:sms` ? "Enviando…" : "Enviar por SMS"}
+              {sendingLabel("sms", "SMS")}
             </Button>
           </Stack>
-        </>
+          <Typography variant="caption" color="text.secondary">
+            E-mail e SMS saem pelo Hubsoft para o cadastro do cliente
+          </Typography>
+        </Box>
       )}
     </OutlinedCard>
-  );
-}
-
-function FiscalNotesSection({ api, clientId }: { api: HubsoftApi; clientId: number }) {
-  return (
-    <Section title="Notas fiscais" defaultOpen={false} lazy>
-      <FiscalNotes api={api} clientId={clientId} />
-    </Section>
   );
 }
 
@@ -292,52 +296,56 @@ function FiscalNotes({ api, clientId }: { api: HubsoftApi; clientId: number }) {
       <LoadState loading={notes.loading} error={notes.error} onRetry={() => void notes.reload()} />
       {notes.data && notes.data.length === 0 && <EmptyState title="Nenhuma nota no período">Tente outro intervalo de datas.</EmptyState>}
       {notes.data && notes.data.length > 0 && (
-        <Box sx={{ overflowX: "auto" }}>
-          <Table size="small" sx={{ "& th": { fontWeight: 700 }, "& th, & td": { whiteSpace: "nowrap", px: 1 } }}>
-            <TableHead>
-              <TableRow>
-                <TableCell>Tipo</TableCell>
-                <TableCell>Número</TableCell>
-                <TableCell>Emissão</TableCell>
-                <TableCell align="right">Valor</TableCell>
-                <TableCell>Situação</TableCell>
-                <TableCell align="right">Ações</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {notes.data.map((note) => (
-                <TableRow key={`${note.kind}-${note.id}`} hover>
-                  <TableCell>{note.kindLabel}</TableCell>
-                  <TableCell>
-                    {note.number}
-                    {note.series ? ` / ${note.series}` : ""}
-                  </TableCell>
-                  <TableCell>{note.issuedAt ?? "—"}</TableCell>
-                  <TableCell align="right">{formatMoney(note.value)}</TableCell>
-                  <TableCell>
-                    <StatusChip kind="note" status={note.status} />
-                  </TableCell>
-                  <TableCell align="right">
-                    {note.pdfUrl && (
-                      <Tooltip title="Abrir PDF">
-                        <IconButton size="small" component={Link} href={note.pdfUrl} target="_blank" rel="noopener" aria-label="Abrir PDF da nota">
-                          <PictureAsPdf fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    <Tooltip title="Enviar por e-mail">
-                      <span>
-                        <IconButton size="small" onClick={() => void sendEmail(note)} disabled={sending !== null || note.canceled} aria-label="Enviar nota por e-mail">
-                          <Email fontSize="small" />
-                        </IconButton>
-                      </span>
+        <Table size="small" sx={{ "& th": { fontWeight: 700 }, "& th, & td": { px: 1 } }}>
+          <TableHead>
+            <TableRow>
+              <TableCell>Nota</TableCell>
+              <TableCell>Emissão</TableCell>
+              <TableCell align="right">Valor</TableCell>
+              <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Situação</TableCell>
+              <TableCell align="right">Ações</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {notes.data.map((note) => (
+              <TableRow key={`${note.kind}-${note.id}`} hover>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    {note.kindLabel} {note.number}
+                  </Typography>
+                  {note.series && (
+                    <Typography variant="caption" color="text.secondary">
+                      série {note.series}
+                    </Typography>
+                  )}
+                </TableCell>
+                <TableCell sx={{ whiteSpace: "nowrap" }}>{note.issuedAt ?? "—"}</TableCell>
+                <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                  {formatMoney(note.value)}
+                </TableCell>
+                <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
+                  <StatusChip kind="note" status={note.status} />
+                </TableCell>
+                <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                  {note.pdfUrl && (
+                    <Tooltip title="Abrir PDF">
+                      <IconButton size="small" component={Link} href={note.pdfUrl} target="_blank" rel="noopener" aria-label="Abrir PDF da nota">
+                        <PictureAsPdf fontSize="small" />
+                      </IconButton>
                     </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Box>
+                  )}
+                  <Tooltip title="Enviar por e-mail">
+                    <span>
+                      <IconButton size="small" onClick={() => void sendEmail(note)} disabled={sending !== null || note.canceled} aria-label="Enviar nota por e-mail">
+                        <Email fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
     </>
   );

@@ -19,11 +19,13 @@ import Typography from "@mui/material/Typography";
 import { useState } from "react";
 import { useAttendance } from "../attendance";
 import { EmptyState, LoadState, TabIntro } from "../components/common";
+import { content, contentTop } from "../components/layout";
 import { OutlinedCard } from "../components/OutlinedCard";
 import { Section } from "../components/Section";
 import { StatusChip } from "../components/StatusChip";
 import { useNotify } from "../components/useFeedback";
 import { useLoad } from "../components/useLoad";
+import { useNarrow } from "../components/useNarrow";
 import { phoneDigits } from "../format";
 import type { Service, ServiceOrder, Ticket } from "../model";
 import { addNote, sendToContact } from "../services/attendance";
@@ -51,7 +53,7 @@ export function TicketsTab() {
 
   if (!data || !client || !api) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: { xs: 2, md: 3 } }}>
         <EmptyState title="Nenhum cliente localizado">Localize o cliente na aba Cliente para ver os chamados.</EmptyState>
       </Box>
     );
@@ -60,16 +62,16 @@ export function TicketsTab() {
   const adjustOpenCount = (delta: number) => setData({ ...data, openTickets: Math.max(0, data.openTickets + delta) });
 
   return (
-    <Box sx={{ px: 3, pb: 4 }}>
-      <Box sx={{ pt: 3 }}>
+    <Box sx={content}>
+      <Box sx={contentTop}>
         <TabIntro
           action={
-            <Button variant="contained" startIcon={<Add />} onClick={() => setCreating(true)} disabled={!service}>
+            <Button variant="contained" startIcon={<Add />} onClick={() => setCreating(true)} disabled={!service} sx={{ whiteSpace: "nowrap" }}>
               Novo chamado
             </Button>
           }
         >
-          Chamados de {client.name} no Hubsoft. Abra um chamado pelo chat e mande o protocolo pro cliente na conversa.
+          Chamados de {client.name} no Hubsoft. Ao abrir um, o protocolo pode ir direto pro cliente na conversa.
         </TabIntro>
 
         <ToggleButtonGroup
@@ -77,16 +79,16 @@ export function TicketsTab() {
           exclusive
           value={showAll ? "todos" : "abertos"}
           onChange={(_event, value: "abertos" | "todos" | null) => value && setShowAll(value === "todos")}
-          sx={{ mb: 3 }}
+          sx={{ mb: 2.5 }}
         >
           <ToggleButton value="abertos">Abertos</ToggleButton>
-          <ToggleButton value="todos">Todos (últimos 20)</ToggleButton>
+          <ToggleButton value="todos">Todos</ToggleButton>
         </ToggleButtonGroup>
 
         <LoadState loading={tickets.loading} error={tickets.error} onRetry={() => void tickets.reload()} />
         {tickets.data && tickets.data.length === 0 && (
           <EmptyState title={showAll ? "Nenhum chamado registrado" : "Nenhum chamado aberto"}>
-            {showAll ? "O cliente ainda não tem atendimentos no Hubsoft." : "Nada pendente para este cliente. Veja em Todos os chamados já fechados."}
+            {showAll ? "O cliente ainda não tem atendimentos no Hubsoft." : "Nada pendente para este cliente. Em Todos aparecem os já fechados."}
           </EmptyState>
         )}
         {tickets.data && tickets.data.length > 0 && (
@@ -275,7 +277,7 @@ function TicketCard({ ticket, api, onChanged, onClose }: { ticket: Ticket; api: 
       )}
 
       {ticket.open && (
-        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", mt: 2, alignItems: "flex-start" }}>
+        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", mt: 2, ml: -1, alignItems: "flex-start" }}>
           <InlineMessage onSend={addMessage} />
           <Button size="small" sx={{ textTransform: "none" }} startIcon={<TaskAlt />} onClick={onClose}>
             Fechar chamado
@@ -332,7 +334,7 @@ function OrderCard({ order, api }: { order: ServiceOrder; api: HubsoftApi }) {
         </Typography>
       )}
       {!finished && (
-        <Box sx={{ mt: 2 }}>
+        <Box sx={{ mt: 2, ml: -1 }}>
           <InlineMessage onSend={addMessage} />
         </Box>
       )}
@@ -343,6 +345,7 @@ function OrderCard({ order, api }: { order: ServiceOrder; api: HubsoftApi }) {
 function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi; service: Service; onClose: () => void; onCreated: () => void }) {
   const { attendance, data } = useAttendance();
   const notify = useNotify();
+  const narrow = useNarrow();
   const client = data?.client ?? null;
   const catalogs = useLoad(() => Promise.all([ticketTypes(api), ticketStatuses(api)]).then(([types, statuses]) => ({ types, statuses })));
   const [typeId, setTypeId] = useState("");
@@ -381,7 +384,7 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
   };
 
   return (
-    <Dialog open onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth>
+    <Dialog open onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth fullScreen={narrow}>
       <DialogTitle>Novo chamado no Hubsoft</DialogTitle>
       <DialogContent>
         <Stack spacing={3} sx={{ mt: 1 }}>
@@ -389,6 +392,19 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
             Serviço: {service.planNumber !== null ? `(${service.planNumber}) ` : ""}
             {service.name}
           </Typography>
+          <TextField
+            label="O que o cliente relatou"
+            multiline
+            minRows={4}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            autoFocus
+            required
+            fullWidth
+            placeholder="Ex.: sem internet desde ontem à noite, já reiniciou o roteador"
+            helperText="Vai para o histórico do cliente no Hubsoft"
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
           <LoadState loading={catalogs.loading} error={catalogs.error} onRetry={() => void catalogs.reload()} />
           {catalogs.data && (
             <>
@@ -417,19 +433,6 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
               </TextField>
             </>
           )}
-          <TextField
-            label="Descrição"
-            multiline
-            minRows={4}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            autoFocus
-            required
-            fullWidth
-            placeholder="O que o cliente relatou e o que já foi feito"
-            helperText="Vai para o histórico do cliente no Hubsoft"
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
           <FormControlLabel
             control={<Checkbox checked={notifyClient} onChange={(event) => setNotifyClient(event.target.checked)} />}
             label="Enviar o número do protocolo pro cliente na conversa"
@@ -451,6 +454,7 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
 function CloseTicketDialog({ api, ticket, onClose, onClosed }: { api: HubsoftApi; ticket: Ticket; onClose: () => void; onClosed: () => void }) {
   const { attendance } = useAttendance();
   const notify = useNotify();
+  const narrow = useNarrow();
   const reasons = useLoad(() => closeReasons(api));
   const [reasonId, setReasonId] = useState("");
   const [description, setDescription] = useState("Atendimento concluído pelo FOCUS Chat.");
@@ -470,7 +474,7 @@ function CloseTicketDialog({ api, ticket, onClose, onClosed }: { api: HubsoftApi
   };
 
   return (
-    <Dialog open onClose={saving ? undefined : onClose} maxWidth="xs" fullWidth>
+    <Dialog open onClose={saving ? undefined : onClose} maxWidth="xs" fullWidth fullScreen={narrow}>
       <DialogTitle>Fechar o chamado {ticket.protocol}?</DialogTitle>
       <DialogContent>
         <Stack spacing={3} sx={{ mt: 1 }}>

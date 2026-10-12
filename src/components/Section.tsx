@@ -13,17 +13,25 @@ interface Props {
   defaultOpen?: boolean;
   /** Só monta o conteúdo quando a seção é aberta pela primeira vez (evita chamadas à API à toa). */
   lazy?: boolean;
+  /** Controle externo de aberto/fechado (ex.: abrir a seção depois de uma ação). */
+  open?: boolean;
+  onToggle?: (open: boolean) => void;
   children: ReactNode;
 }
 
 /** Seção recolhível no mesmo formato das telas do FOCUS Chat: título, seta e linha. */
-export function Section({ title, aside, defaultOpen = true, lazy = false, children }: Props) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [opened, setOpened] = useState(defaultOpen);
+export function Section({ title, aside, defaultOpen = true, lazy = false, open: controlled, onToggle, children }: Props) {
+  const [internal, setInternal] = useState(defaultOpen);
+  const open = controlled ?? internal;
+  const [opened, setOpened] = useState(open);
+
   const toggle = () => {
-    setOpen((value) => !value);
+    const next = !open;
+    onToggle?.(next);
+    if (controlled === undefined) setInternal(next);
     setOpened(true);
   };
+
   return (
     <Box component="section">
       <Box
@@ -49,7 +57,7 @@ export function Section({ title, aside, defaultOpen = true, lazy = false, childr
         </IconButton>
       </Box>
       <Collapse in={open}>
-        <Box sx={{ pt: 3, pb: 1 }}>{(!lazy || opened) && children}</Box>
+        <Box sx={{ pt: 3, pb: 1 }}>{(!lazy || opened || open) && children}</Box>
       </Collapse>
     </Box>
   );

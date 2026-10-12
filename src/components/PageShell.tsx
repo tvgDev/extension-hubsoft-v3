@@ -7,10 +7,11 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { headerGradient } from "../theme";
 
-// Medidas da tela de agentes do FOCUS Chat: faixa escura de 149px e cartão
-// branco começando aos 99px, de modo que as abas fiquem sobre a faixa.
-const HEADER_HEIGHT = 149;
-const CARD_TOP = 99;
+// Medidas da tela de agentes do FOCUS Chat no desktop: faixa escura de 149px e
+// cartão branco começando aos 99px. No widget lateral a faixa encolhe para
+// sobrar tela para o conteúdo, mantendo o cartão sobre a faixa.
+const HEADER = { xs: 104, md: 149 };
+const CARD_TOP = { xs: 64, md: 99 };
 
 interface Props {
   title: string;
@@ -28,7 +29,7 @@ export function PageShell({ title, back, actions, banner, children }: Props) {
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
       {banner}
-      <Box sx={{ height: HEADER_HEIGHT, background: headerGradient, color: "#fff" }}>
+      <Box sx={{ height: HEADER, background: headerGradient, color: "#fff" }}>
         <Box
           sx={{
             height: CARD_TOP,
@@ -51,7 +52,7 @@ export function PageShell({ title, back, actions, banner, children }: Props) {
               </Button>
             )}
           </Box>
-          <Typography component="h1" noWrap sx={{ fontSize: "1.25rem", fontWeight: 700, textAlign: "center", maxWidth: "60vw" }}>
+          <Typography component="h1" noWrap sx={{ fontSize: { xs: "1.125rem", md: "1.25rem" }, fontWeight: 700, textAlign: "center", maxWidth: "60vw" }}>
             {title}
           </Typography>
           <Box sx={{ justifySelf: "end" }}>{actions}</Box>
@@ -60,9 +61,9 @@ export function PageShell({ title, back, actions, banner, children }: Props) {
       <Paper
         elevation={0}
         sx={{
-          mx: { xs: 1.5, md: 4 },
-          mt: `${CARD_TOP - HEADER_HEIGHT}px`,
-          minHeight: `calc(100vh - ${CARD_TOP}px)`,
+          mx: { xs: 1, md: 4 },
+          mt: { xs: `${CARD_TOP.xs - HEADER.xs}px`, md: `${CARD_TOP.md - HEADER.md}px` },
+          minHeight: { xs: `calc(100vh - ${CARD_TOP.xs}px)`, md: `calc(100vh - ${CARD_TOP.md}px)` },
           borderRadius: "8px 8px 0 0",
           boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
           display: "flex",
