@@ -72,6 +72,17 @@ export const theme = createTheme({
     MuiTooltip: {
       defaultProps: { arrow: true },
     },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          maxHeight: "calc(100vh - 50px)",
+        },
+        paperFullScreen: {
+          height: "calc(100vh - 50px) !important",
+          maxHeight: "calc(100vh - 50px) !important",
+        },
+      },
+    },
     MuiDialogTitle: {
       styleOverrides: { root: { fontWeight: 700, color: colors.navy } },
     },

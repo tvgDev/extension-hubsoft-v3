@@ -1,6 +1,7 @@
 import Add from "@mui/icons-material/Add";
 import AssignmentOutlined from "@mui/icons-material/AssignmentOutlined";
 import ChatBubbleOutline from "@mui/icons-material/ChatBubbleOutlined";
+import Close from "@mui/icons-material/Close";
 import Send from "@mui/icons-material/Send";
 import TaskAlt from "@mui/icons-material/TaskAlt";
 import Box from "@mui/material/Box";
@@ -11,6 +12,7 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
+import IconButton from "@mui/material/IconButton";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
@@ -467,10 +469,33 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
   };
 
   return (
-    <Dialog open onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth fullScreen={narrow}>
-      <DialogTitle>Novo chamado no Hubsoft</DialogTitle>
-      <DialogContent>
-        <Stack spacing={3} sx={{ mt: 1 }}>
+    <Dialog
+      open
+      onClose={saving ? undefined : onClose}
+      maxWidth="sm"
+      fullWidth
+      fullScreen={narrow}
+      slotProps={{
+        paper: {
+          sx: {
+            height: narrow ? "calc(100vh - 50px)" : undefined,
+            maxHeight: narrow ? "calc(100vh - 50px)" : "calc(100vh - 64px)",
+            display: "flex",
+            flexDirection: "column",
+          },
+        },
+      }}
+    >
+      <DialogTitle sx={{ m: 0, px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Typography variant="h6" component="span" sx={{ fontWeight: 700, color: "primary.main" }}>
+          Novo chamado no Hubsoft
+        </Typography>
+        <IconButton aria-label="fechar" onClick={onClose} disabled={saving} size="small">
+          <Close />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent dividers sx={{ p: 2.5 }}>
+        <Stack spacing={2} sx={{ mt: 0.5 }}>
           <Typography variant="body2" color="text.secondary">
             Serviço: {service.planNumber !== null ? `(${service.planNumber}) ` : ""}
             {service.name}
@@ -478,7 +503,7 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
           <TextField
             label="O que o cliente relatou"
             multiline
-            minRows={4}
+            minRows={3}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             autoFocus
@@ -535,7 +560,7 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
           />
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: 1, borderColor: "divider", bgcolor: "background.paper", flexShrink: 0 }}>
         <Button onClick={onClose} disabled={saving}>
           Cancelar
         </Button>
@@ -570,10 +595,33 @@ function CloseTicketDialog({ api, ticket, onClose, onClosed }: { api: HubsoftApi
   };
 
   return (
-    <Dialog open onClose={saving ? undefined : onClose} maxWidth="xs" fullWidth fullScreen={narrow}>
-      <DialogTitle>Fechar o chamado {ticket.protocol}?</DialogTitle>
-      <DialogContent>
-        <Stack spacing={3} sx={{ mt: 1 }}>
+    <Dialog
+      open
+      onClose={saving ? undefined : onClose}
+      maxWidth="xs"
+      fullWidth
+      fullScreen={narrow}
+      slotProps={{
+        paper: {
+          sx: {
+            height: narrow ? "calc(100vh - 50px)" : undefined,
+            maxHeight: narrow ? "calc(100vh - 50px)" : "calc(100vh - 64px)",
+            display: "flex",
+            flexDirection: "column",
+          },
+        },
+      }}
+    >
+      <DialogTitle sx={{ m: 0, px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Typography variant="h6" component="span" sx={{ fontWeight: 700, color: "primary.main" }}>
+          Fechar o chamado {ticket.protocol}?
+        </Typography>
+        <IconButton aria-label="fechar" onClick={onClose} disabled={saving} size="small">
+          <Close />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent dividers sx={{ p: 2.5 }}>
+        <Stack spacing={2} sx={{ mt: 0.5 }}>
           <LoadState loading={reasons.loading} error={reasons.error} onRetry={() => void reasons.reload()} />
           {reasons.data && (
             <TextField
@@ -604,7 +652,7 @@ function CloseTicketDialog({ api, ticket, onClose, onClosed }: { api: HubsoftApi
           />
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: 1, borderColor: "divider", bgcolor: "background.paper", flexShrink: 0 }}>
         <Button onClick={onClose} disabled={saving}>
           Cancelar
         </Button>
