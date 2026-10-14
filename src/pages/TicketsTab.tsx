@@ -1,18 +1,13 @@
 import Add from "@mui/icons-material/Add";
+import ArrowBack from "@mui/icons-material/ArrowBack";
 import AssignmentOutlined from "@mui/icons-material/AssignmentOutlined";
 import ChatBubbleOutline from "@mui/icons-material/ChatBubbleOutlined";
-import Close from "@mui/icons-material/Close";
 import Send from "@mui/icons-material/Send";
 import TaskAlt from "@mui/icons-material/TaskAlt";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
-import IconButton from "@mui/material/IconButton";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
@@ -28,7 +23,6 @@ import { Section } from "../components/Section";
 import { StatusChip } from "../components/StatusChip";
 import { useNotify } from "../components/useFeedback";
 import { useLoad } from "../components/useLoad";
-import { useNarrow } from "../components/useNarrow";
 import { phoneDigits } from "../format";
 import type { Service, ServiceOrder, Ticket } from "../model";
 import { addNote, sendToContact } from "../services/attendance";
@@ -64,6 +58,36 @@ export function TicketsTab() {
   }
 
   const adjustOpenCount = (delta: number) => setData({ ...data, openTickets: Math.max(0, data.openTickets + delta) });
+
+  if (creating && service) {
+    return (
+      <NewTicketView
+        api={api}
+        service={service}
+        onBack={() => setCreating(false)}
+        onCreated={() => {
+          setCreating(false);
+          adjustOpenCount(1);
+          void tickets.reload();
+        }}
+      />
+    );
+  }
+
+  if (closing) {
+    return (
+      <CloseTicketView
+        api={api}
+        ticket={closing}
+        onBack={() => setClosing(null)}
+        onClosed={() => {
+          setClosing(null);
+          adjustOpenCount(-1);
+          void tickets.reload();
+        }}
+      />
+    );
+  }
 
   return (
     <Box sx={content}>
@@ -138,31 +162,6 @@ export function TicketsTab() {
           </Stack>
         )}
       </Section>
-
-      {creating && service && (
-        <NewTicketDialog
-          api={api}
-          service={service}
-          onClose={() => setCreating(false)}
-          onCreated={() => {
-            setCreating(false);
-            adjustOpenCount(1);
-            void tickets.reload();
-          }}
-        />
-      )}
-      {closing && (
-        <CloseTicketDialog
-          api={api}
-          ticket={closing}
-          onClose={() => setClosing(null)}
-          onClosed={() => {
-            setClosing(null);
-            adjustOpenCount(-1);
-            void tickets.reload();
-          }}
-        />
-      )}
     </Box>
   );
 }
@@ -396,10 +395,19 @@ const SELECT_MENU_PROPS = {
   },
 };
 
-function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi; service: Service; onClose: () => void; onCreated: () => void }) {
+function NewTicketView({
+  api,
+  service,
+  onBack,
+  onCreated,
+}: {
+  api: HubsoftApi;
+  service: Service;
+  onBack: () => void;
+  onCreated: () => void;
+}) {
   const { attendance, data } = useAttendance();
   const notify = useNotify();
-  const narrow = useNarrow();
   const client = data?.client ?? null;
   const catalogs = useLoad(() => Promise.all([ticketTypes(api), ticketStatuses(api)]).then(([types, statuses]) => ({ types, statuses })));
   const [typeId, setTypeId] = useState("");
@@ -435,7 +443,7 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
           orderOpened = true;
         } catch (osFailure) {
           notify.error(
-            `Chamado aberto (protocolo ${protocol ?? "—"}), mas ocorreu uma falha ao abrir a OS: ${errorMessage(osFailure)}`
+            `Chamado aberto (protocolo ${protocol ?? "—"}), mas ocorreu uma falha ao abrir a OS: ${errorMessage(osFailure)}`,
           );
         }
       }
@@ -469,87 +477,117 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
   };
 
   return (
-    <Dialog
-      open
-      onClose={saving ? undefined : onClose}
-      maxWidth="sm"
-      fullWidth
-      fullScreen={narrow}
-      slotProps={{
-        paper: {
-          sx: {
-            height: narrow ? "calc(100vh - 50px)" : undefined,
-            maxHeight: narrow ? "calc(100vh - 50px)" : "calc(100vh - 64px)",
-            display: "flex",
-            flexDirection: "column",
-          },
-        },
-      }}
-    >
-      <DialogTitle sx={{ m: 0, px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Typography variant="h6" component="span" sx={{ fontWeight: 700, color: "primary.main" }}>
+    <Box sx={content}>
+      <Stack
+        direction="row"
+        spacing={1.5}
+        sx={{
+          alignItems: "center",
+          mb: 2,
+          pb: 1.5,
+          borderBottom: 1,
+          borderColor: "divider",
+        }}
+      >
+        <Button
+          startIcon={<ArrowBack />}
+          onClick={onBack}
+          disabled={saving}
+          size="small"
+          variant="outlined"
+          sx={{
+            textTransform: "none",
+            fontWeight: 600,
+            borderRadius: 1.5,
+            color: "text.primary",
+            borderColor: "divider",
+            bgcolor: "background.paper",
+            "&:hover": {
+              borderColor: "primary.main",
+              bgcolor: "action.hover",
+            },
+          }}
+        >
+          Voltar
+        </Button>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "primary.main", fontSize: "1.05rem" }}>
           Novo chamado no Hubsoft
         </Typography>
-        <IconButton aria-label="fechar" onClick={onClose} disabled={saving} size="small">
-          <Close />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent dividers sx={{ p: 2.5 }}>
-        <Stack spacing={2} sx={{ mt: 0.5 }}>
-          <Typography variant="body2" color="text.secondary">
-            Serviço: {service.planNumber !== null ? `(${service.planNumber}) ` : ""}
-            {service.name}
-          </Typography>
-          <TextField
-            label="O que o cliente relatou"
-            multiline
-            minRows={3}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            autoFocus
-            required
-            fullWidth
-            placeholder="Ex.: sem internet desde ontem à noite, já reiniciou o roteador"
-            helperText="Vai para o histórico do cliente no Hubsoft"
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
-          <LoadState loading={catalogs.loading} error={catalogs.error} onRetry={() => void catalogs.reload()} />
-          {catalogs.data && (
-            <>
-              <TextField
-                select
-                label="Tipo de atendimento"
-                value={typeId}
-                onChange={(event) => setTypeId(event.target.value)}
-                fullWidth
-                helperText="Sem escolher, o Hubsoft usa o tipo padrão (SAC)"
-                slotProps={{ select: { MenuProps: SELECT_MENU_PROPS } }}
-              >
-                <MenuItem value="">Padrão do Hubsoft</MenuItem>
-                {catalogs.data.types.map((item) => (
-                  <MenuItem key={item.id} value={String(item.id)}>
-                    {item.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                select
-                label="Situação inicial"
-                value={statusId}
-                onChange={(event) => setStatusId(event.target.value)}
-                fullWidth
-                helperText="Opcional. Sem escolher, o Hubsoft usa a situação padrão"
-                slotProps={{ select: { MenuProps: SELECT_MENU_PROPS } }}
-              >
-                <MenuItem value="">Padrão do Hubsoft</MenuItem>
-                {catalogs.data.statuses.map((item) => (
-                  <MenuItem key={item.id} value={String(item.id)}>
-                    {item.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </>
-          )}
+      </Stack>
+
+      <Box
+        sx={{
+          bgcolor: "background.paper",
+          p: 1.5,
+          borderRadius: 2,
+          border: 1,
+          borderColor: "divider",
+          mb: 2,
+        }}
+      >
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: "block", textTransform: "uppercase", letterSpacing: 0.5, mb: 0.25 }}>
+          Serviço
+        </Typography>
+        <Typography variant="body2" sx={{ fontWeight: 600, color: "text.primary" }}>
+          {service.planNumber !== null ? `(${service.planNumber}) ` : ""}{service.name}
+        </Typography>
+      </Box>
+
+      <Stack spacing={2.5}>
+        <TextField
+          label="O que o cliente relatou"
+          multiline
+          minRows={3}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          autoFocus
+          required
+          fullWidth
+          placeholder="Ex.: sem internet desde ontem à noite, já reiniciou o roteador"
+          helperText="Vai para o histórico do cliente no Hubsoft"
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+
+        <LoadState loading={catalogs.loading} error={catalogs.error} onRetry={() => void catalogs.reload()} />
+        {catalogs.data && (
+          <>
+            <TextField
+              select
+              label="Tipo de atendimento"
+              value={typeId}
+              onChange={(event) => setTypeId(event.target.value)}
+              fullWidth
+              helperText="Sem escolher, o Hubsoft usa o tipo padrão (SAC)"
+              slotProps={{ select: { MenuProps: SELECT_MENU_PROPS } }}
+            >
+              <MenuItem value="">Padrão do Hubsoft</MenuItem>
+              {catalogs.data.types.map((item) => (
+                <MenuItem key={item.id} value={String(item.id)}>
+                  {item.label}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select
+              label="Situação inicial"
+              value={statusId}
+              onChange={(event) => setStatusId(event.target.value)}
+              fullWidth
+              helperText="Opcional. Sem escolher, o Hubsoft usa a situação padrão"
+              slotProps={{ select: { MenuProps: SELECT_MENU_PROPS } }}
+            >
+              <MenuItem value="">Padrão do Hubsoft</MenuItem>
+              {catalogs.data.statuses.map((item) => (
+                <MenuItem key={item.id} value={String(item.id)}>
+                  {item.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </>
+        )}
+
+        <Stack spacing={1}>
           <FormControlLabel
             control={<Checkbox checked={openOrder} onChange={(event) => setOpenOrder(event.target.checked)} />}
             label="Abrir Ordem de Serviço (OS) vinculada ao chamado"
@@ -559,23 +597,38 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
             label="Enviar o número do protocolo pro cliente na conversa"
           />
         </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: 1, borderColor: "divider", bgcolor: "background.paper", flexShrink: 0 }}>
-        <Button onClick={onClose} disabled={saving}>
-          Cancelar
-        </Button>
-        <Button variant="contained" onClick={() => void submit()} disabled={saving || !description.trim()}>
-          {saving ? "Abrindo…" : "Abrir chamado"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+
+        <Stack direction="row" spacing={1.5} sx={{ pt: 2, pb: 1, borderTop: 1, borderColor: "divider" }}>
+          <Button variant="outlined" onClick={onBack} disabled={saving} sx={{ flex: 1, py: 1.2 }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void submit()}
+            disabled={saving || !description.trim()}
+            sx={{ flex: 1.5, py: 1.2, fontWeight: 700 }}
+          >
+            {saving ? "Abrindo…" : "Abrir chamado"}
+          </Button>
+        </Stack>
+      </Stack>
+    </Box>
   );
 }
 
-function CloseTicketDialog({ api, ticket, onClose, onClosed }: { api: HubsoftApi; ticket: Ticket; onClose: () => void; onClosed: () => void }) {
+function CloseTicketView({
+  api,
+  ticket,
+  onBack,
+  onClosed,
+}: {
+  api: HubsoftApi;
+  ticket: Ticket;
+  onBack: () => void;
+  onClosed: () => void;
+}) {
   const { attendance } = useAttendance();
   const notify = useNotify();
-  const narrow = useNarrow();
   const reasons = useLoad(() => closeReasons(api));
   const [reasonId, setReasonId] = useState("");
   const [description, setDescription] = useState("Atendimento concluído pelo FOCUS Chat.");
@@ -584,7 +637,10 @@ function CloseTicketDialog({ api, ticket, onClose, onClosed }: { api: HubsoftApi
   const submit = async () => {
     setSaving(true);
     try {
-      await api.closeTicket(ticket.id, { id_motivo_fechamento_atendimento: reasonId ? Number(reasonId) : undefined, descricao_fechamento: description.trim() });
+      await api.closeTicket(ticket.id, {
+        id_motivo_fechamento_atendimento: reasonId ? Number(reasonId) : undefined,
+        descricao_fechamento: description.trim(),
+      });
       await addNote(attendance, `Chamado ${ticket.protocol} fechado no Hubsoft pelo atendente.`);
       notify.success(`Chamado ${ticket.protocol} fechado`);
       onClosed();
@@ -595,71 +651,113 @@ function CloseTicketDialog({ api, ticket, onClose, onClosed }: { api: HubsoftApi
   };
 
   return (
-    <Dialog
-      open
-      onClose={saving ? undefined : onClose}
-      maxWidth="xs"
-      fullWidth
-      fullScreen={narrow}
-      slotProps={{
-        paper: {
-          sx: {
-            height: narrow ? "calc(100vh - 50px)" : undefined,
-            maxHeight: narrow ? "calc(100vh - 50px)" : "calc(100vh - 64px)",
-            display: "flex",
-            flexDirection: "column",
-          },
-        },
-      }}
-    >
-      <DialogTitle sx={{ m: 0, px: 2.5, py: 2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Typography variant="h6" component="span" sx={{ fontWeight: 700, color: "primary.main" }}>
-          Fechar o chamado {ticket.protocol}?
+    <Box sx={content}>
+      <Stack
+        direction="row"
+        spacing={1.5}
+        sx={{
+          alignItems: "center",
+          mb: 2,
+          pb: 1.5,
+          borderBottom: 1,
+          borderColor: "divider",
+        }}
+      >
+        <Button
+          startIcon={<ArrowBack />}
+          onClick={onBack}
+          disabled={saving}
+          size="small"
+          variant="outlined"
+          sx={{
+            textTransform: "none",
+            fontWeight: 600,
+            borderRadius: 1.5,
+            color: "text.primary",
+            borderColor: "divider",
+            bgcolor: "background.paper",
+            "&:hover": {
+              borderColor: "primary.main",
+              bgcolor: "action.hover",
+            },
+          }}
+        >
+          Voltar
+        </Button>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "primary.main", fontSize: "1.05rem" }}>
+          Fechar chamado
         </Typography>
-        <IconButton aria-label="fechar" onClick={onClose} disabled={saving} size="small">
-          <Close />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent dividers sx={{ p: 2.5 }}>
-        <Stack spacing={2} sx={{ mt: 0.5 }}>
-          <LoadState loading={reasons.loading} error={reasons.error} onRetry={() => void reasons.reload()} />
-          {reasons.data && (
-            <TextField
-              select
-              label="Motivo do fechamento"
-              value={reasonId}
-              onChange={(event) => setReasonId(event.target.value)}
-              fullWidth
-              helperText="Sem escolher, o Hubsoft usa o motivo padrão"
-              slotProps={{ select: { MenuProps: SELECT_MENU_PROPS } }}
-            >
-              <MenuItem value="">Padrão do Hubsoft</MenuItem>
-              {reasons.data.map((item) => (
-                <MenuItem key={item.id} value={String(item.id)}>
-                  {item.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          )}
+      </Stack>
+
+      <Box
+        sx={{
+          bgcolor: "background.paper",
+          p: 1.5,
+          borderRadius: 2,
+          border: 1,
+          borderColor: "divider",
+          mb: 2,
+        }}
+      >
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: "block", textTransform: "uppercase", letterSpacing: 0.5, mb: 0.25 }}>
+          Protocolo
+        </Typography>
+        <Typography variant="body2" sx={{ fontWeight: 700, color: "text.primary" }}>
+          {ticket.protocol}
+        </Typography>
+        {ticket.serviceName && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {ticket.serviceName}
+          </Typography>
+        )}
+      </Box>
+
+      <Stack spacing={2.5}>
+        <LoadState loading={reasons.loading} error={reasons.error} onRetry={() => void reasons.reload()} />
+        {reasons.data && (
           <TextField
-            label="Descrição do fechamento"
-            multiline
-            minRows={3}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
+            select
+            label="Motivo do fechamento"
+            value={reasonId}
+            onChange={(event) => setReasonId(event.target.value)}
             fullWidth
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
+            helperText="Sem escolher, o Hubsoft usa o motivo padrão"
+            slotProps={{ select: { MenuProps: SELECT_MENU_PROPS } }}
+          >
+            <MenuItem value="">Padrão do Hubsoft</MenuItem>
+            {reasons.data.map((item) => (
+              <MenuItem key={item.id} value={String(item.id)}>
+                {item.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
+
+        <TextField
+          label="Descrição do fechamento"
+          multiline
+          minRows={3}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          fullWidth
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+
+        <Stack direction="row" spacing={1.5} sx={{ pt: 2, pb: 1, borderTop: 1, borderColor: "divider" }}>
+          <Button variant="outlined" onClick={onBack} disabled={saving} sx={{ flex: 1, py: 1.2 }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => void submit()}
+            disabled={saving || !description.trim()}
+            sx={{ flex: 1.5, py: 1.2, fontWeight: 700 }}
+          >
+            {saving ? "Fechando…" : "Fechar chamado"}
+          </Button>
         </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: 1, borderColor: "divider", bgcolor: "background.paper", flexShrink: 0 }}>
-        <Button onClick={onClose} disabled={saving}>
-          Cancelar
-        </Button>
-        <Button variant="contained" onClick={() => void submit()} disabled={saving || !description.trim()}>
-          {saving ? "Fechando…" : "Fechar chamado"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+      </Stack>
+    </Box>
   );
 }
