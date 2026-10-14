@@ -85,9 +85,13 @@ export function Home({ tab }: { tab: HomeTab }) {
     return node;
   };
 
+  const currentTab = TABS.find((entry) => entry.key === tab);
+  const title = tab === "cliente" ? "Hubsoft" : (currentTab?.label ?? "Hubsoft");
+
   return (
     <PageShell
-      title="Hubsoft"
+      title={title}
+      back={tab !== "cliente" ? { label: "Voltar", to: "/cliente" } : undefined}
       actions={
         <Tooltip title="Buscar de novo no Hubsoft">
           <span>

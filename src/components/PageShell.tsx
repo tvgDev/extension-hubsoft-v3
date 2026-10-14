@@ -9,7 +9,7 @@ import { headerGradient } from "../theme";
 interface Props {
   title: string;
   /** Botão "← Voltar" no canto esquerdo da faixa. */
-  back?: { label: string; to: string };
+  back?: { label?: string; to?: string; onClick?: () => void };
   /** Canto direito da faixa (menu da conta, ajuda…); ícones em branco. */
   actions?: ReactNode;
   /** Faixa acima do cabeçalho (avisos de conta, período de teste…). */
@@ -55,13 +55,23 @@ export function PageShell({ title, back, actions, banner, tabs, subHeader, child
         <Box sx={{ display: "flex", alignItems: "center", minWidth: 0, gap: 1 }}>
           {back && (
             <Button
-              component={Link}
-              to={back.to}
+              {...(back.to ? { component: Link, to: back.to } : { onClick: back.onClick })}
               startIcon={<ArrowBack />}
               size="small"
-              sx={{ color: "#fff", textTransform: "none", fontWeight: 500, fontSize: "0.875rem", ml: -0.5 }}
+              sx={{
+                color: "#fff",
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: { xs: "0.8125rem", md: "0.875rem" },
+                minWidth: 0,
+                px: { xs: 0.75, md: 1 },
+                py: 0.25,
+                mr: 0.5,
+                borderRadius: 1,
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.15)" },
+              }}
             >
-              {back.label}
+              {back.label ?? "Voltar"}
             </Button>
           )}
           <Typography
