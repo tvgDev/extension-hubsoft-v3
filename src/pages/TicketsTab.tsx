@@ -490,28 +490,29 @@ function NewTicketView({
         }}
       >
         <Button
-          startIcon={<ArrowBack />}
+          startIcon={<ArrowBack sx={{ fontSize: "1.1rem !important" }} />}
           onClick={onBack}
           disabled={saving}
           size="small"
-          variant="outlined"
           sx={{
+            color: "text.secondary",
             textTransform: "none",
             fontWeight: 600,
-            borderRadius: 1.5,
-            color: "text.primary",
-            borderColor: "divider",
-            bgcolor: "background.paper",
+            fontSize: "0.875rem",
+            px: 1,
+            py: 0.5,
+            borderRadius: 1,
+            bgcolor: "action.hover",
             "&:hover": {
-              borderColor: "primary.main",
-              bgcolor: "action.hover",
+              color: "primary.main",
+              bgcolor: "action.selected",
             },
           }}
         >
           Voltar
         </Button>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "primary.main", fontSize: "1.05rem" }}>
-          Novo chamado no Hubsoft
+          Novo chamado
         </Typography>
       </Stack>
 
@@ -664,21 +665,22 @@ function CloseTicketView({
         }}
       >
         <Button
-          startIcon={<ArrowBack />}
+          startIcon={<ArrowBack sx={{ fontSize: "1.1rem !important" }} />}
           onClick={onBack}
           disabled={saving}
           size="small"
-          variant="outlined"
           sx={{
+            color: "text.secondary",
             textTransform: "none",
             fontWeight: 600,
-            borderRadius: 1.5,
-            color: "text.primary",
-            borderColor: "divider",
-            bgcolor: "background.paper",
+            fontSize: "0.875rem",
+            px: 1,
+            py: 0.5,
+            borderRadius: 1,
+            bgcolor: "action.hover",
             "&:hover": {
-              borderColor: "primary.main",
-              bgcolor: "action.hover",
+              color: "primary.main",
+              bgcolor: "action.selected",
             },
           }}
         >
