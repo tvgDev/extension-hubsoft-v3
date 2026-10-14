@@ -9,6 +9,7 @@ import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
@@ -243,34 +244,34 @@ function History({ api, login }: { api: HubsoftApi; login: string }) {
               {formatMegabytes(history.data.totals.uploadMb)} enviados
             </Typography>
           )}
-          <Table size="small" sx={{ "& th": { fontWeight: 700 }, "& th, & td": { px: 1 } }}>
-            <TableHead>
-              <TableRow>
-                <TableCell>Início</TableCell>
-                <TableCell>Fim</TableCell>
-                <TableCell sx={wideOnly}>IP</TableCell>
-                <TableCell align="right">Download</TableCell>
-                <TableCell align="right" sx={wideOnly}>
-                  Upload
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {history.data.records.map((record, index) => (
-                <TableRow key={index} hover>
-                  <TableCell>{record.start ?? "—"}</TableCell>
-                  <TableCell>{record.end ?? <Chip size="small" color="success" label="Ativa" />}</TableCell>
-                  <TableCell sx={wideOnly}>{record.ip ?? "—"}</TableCell>
-                  <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                    {formatMegabytes(record.downloadMb)}
-                  </TableCell>
-                  <TableCell align="right" sx={wideOnly}>
-                    {formatMegabytes(record.uploadMb)}
-                  </TableCell>
+          <TableContainer sx={{ overflowX: "auto" }}>
+            <Table size="small" sx={{ minWidth: 320, "& th": { fontWeight: 700 }, "& th, & td": { px: 1 } }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Início</TableCell>
+                  <TableCell>Fim</TableCell>
+                  <TableCell sx={wideOnly}>IP</TableCell>
+                  <TableCell align="right">Download</TableCell>
+                  <TableCell align="right">Upload</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {history.data.records.map((record, index) => (
+                  <TableRow key={index} hover>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{record.start ?? "—"}</TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{record.end ?? <Chip size="small" color="success" label="Ativa" />}</TableCell>
+                    <TableCell sx={{ ...wideOnly, whiteSpace: "nowrap" }}>{record.ip ?? "—"}</TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      {formatMegabytes(record.downloadMb)}
+                    </TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      {formatMegabytes(record.uploadMb)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </>
       )}
     </>

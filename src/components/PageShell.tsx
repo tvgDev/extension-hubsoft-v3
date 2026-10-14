@@ -1,17 +1,10 @@
 import ArrowBack from "@mui/icons-material/ArrowBack";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { headerGradient } from "../theme";
-
-// Medidas da tela de agentes do FOCUS Chat no desktop: faixa escura de 149px e
-// cartão branco começando aos 99px. No widget lateral a faixa encolhe para
-// sobrar tela para o conteúdo, mantendo o cartão sobre a faixa.
-const HEADER = { xs: 104, md: 149 };
-const CARD_TOP = { xs: 64, md: 99 };
 
 interface Props {
   title: string;
@@ -21,57 +14,106 @@ interface Props {
   actions?: ReactNode;
   /** Faixa acima do cabeçalho (avisos de conta, período de teste…). */
   banner?: ReactNode;
+  /** Barra de abas fixada no topo, logo abaixo do cabeçalho. */
+  tabs?: ReactNode;
+  /** Elementos adicionais fixados abaixo das abas (ex.: seletor de serviço). */
+  subHeader?: ReactNode;
   children: ReactNode;
 }
 
-/** Casca de toda página: faixa azul-marinho com título centralizado e cartão branco com as abas. */
-export function PageShell({ title, back, actions, banner, children }: Props) {
+/**
+ * Casca do painel: cabeçalho e abas fixados no topo para nunca sumirem na rolagem,
+ * e área de conteúdo com rolagem independente.
+ */
+export function PageShell({ title, back, actions, banner, tabs, subHeader, children }: Props) {
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+    <Box
+      sx={{
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        bgcolor: "background.default",
+        overflow: "hidden",
+      }}
+    >
       {banner}
-      <Box sx={{ height: HEADER, background: headerGradient, color: "#fff" }}>
-        <Box
-          sx={{
-            height: CARD_TOP,
-            px: { xs: 2, md: 4 },
-            display: "grid",
-            gridTemplateColumns: "1fr auto 1fr",
-            alignItems: "center",
-            gap: 2,
-          }}
-        >
-          <Box>
-            {back && (
-              <Button
-                component={Link}
-                to={back.to}
-                startIcon={<ArrowBack />}
-                sx={{ color: "#fff", textTransform: "none", fontWeight: 500, fontSize: "1rem", ml: -1 }}
-              >
-                {back.label}
-              </Button>
-            )}
-          </Box>
-          <Typography component="h1" noWrap sx={{ fontSize: { xs: "1.125rem", md: "1.25rem" }, fontWeight: 700, textAlign: "center", maxWidth: "60vw" }}>
+
+      {/* Faixa azul-marinho compacta e fixa */}
+      <Box
+        sx={{
+          background: headerGradient,
+          color: "#fff",
+          flexShrink: 0,
+          height: { xs: 46, md: 54 },
+          px: { xs: 1.5, md: 3 },
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          zIndex: 1100,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", minWidth: 0, gap: 1 }}>
+          {back && (
+            <Button
+              component={Link}
+              to={back.to}
+              startIcon={<ArrowBack />}
+              size="small"
+              sx={{ color: "#fff", textTransform: "none", fontWeight: 500, fontSize: "0.875rem", ml: -0.5 }}
+            >
+              {back.label}
+            </Button>
+          )}
+          <Typography
+            component="h1"
+            noWrap
+            sx={{
+              fontSize: { xs: "0.9375rem", md: "1.125rem" },
+              fontWeight: 700,
+              color: "#fff",
+            }}
+          >
             {title}
           </Typography>
-          <Box sx={{ justifySelf: "end" }}>{actions}</Box>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+          {actions}
         </Box>
       </Box>
-      <Paper
-        elevation={0}
+
+      {/* Abas e controles fixados no topo — nunca somem ao rolar a página */}
+      {tabs && (
+        <Box
+          sx={{
+            bgcolor: "background.paper",
+            borderBottom: 1,
+            borderColor: "divider",
+            flexShrink: 0,
+            zIndex: 1050,
+          }}
+        >
+          {tabs}
+          {subHeader}
+        </Box>
+      )}
+
+      {/* Área de conteúdo rolável de forma independente */}
+      <Box
+        id="attendance-scroll-container"
         sx={{
-          mx: { xs: 1, md: 4 },
-          mt: { xs: `${CARD_TOP.xs - HEADER.xs}px`, md: `${CARD_TOP.md - HEADER.md}px` },
-          minHeight: { xs: `calc(100vh - ${CARD_TOP.xs}px)`, md: `calc(100vh - ${CARD_TOP.md}px)` },
-          borderRadius: "8px 8px 0 0",
-          boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+          flex: 1,
+          overflowY: "auto",
+          overflowX: "hidden",
+          bgcolor: "background.paper",
+          WebkitOverflowScrolling: "touch",
           display: "flex",
           flexDirection: "column",
         }}
       >
-        {children}
-      </Paper>
+        <Box sx={{ flex: 1 }}>
+          {children}
+        </Box>
+      </Box>
     </Box>
   );
 }

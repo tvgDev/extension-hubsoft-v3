@@ -33,6 +33,15 @@ export const theme = createTheme({
     button: { fontWeight: 700 },
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        "html, body, #root": {
+          height: "100%",
+          margin: 0,
+          padding: 0,
+        },
+      },
+    },
     MuiButton: {
       defaultProps: { disableElevation: false },
       styleOverrides: { root: { letterSpacing: "0.02em" } },

@@ -98,10 +98,10 @@ export function ClientTab() {
       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", pt: 2.5 }}>
         <RoundAvatar src={avatar} size={40} />
         <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
+          <Typography sx={{ fontWeight: 700, lineHeight: 1.2, wordBreak: "break-word" }}>
             {contact.nomeSecundario || "Cliente"}
           </Typography>
-          <Typography variant="body2" color="text.secondary" noWrap>
+          <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-word" }}>
             {contact.numero} · WhatsApp
           </Typography>
         </Box>

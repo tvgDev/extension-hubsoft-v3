@@ -25,11 +25,11 @@ export function StatusTile({ icon, title, caption, color, to }: Props) {
         <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
           <Box sx={{ color: tone, display: "flex", flexShrink: 0 }}>{icon}</Box>
           <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
+            <Typography sx={{ fontWeight: 700, lineHeight: 1.2, wordBreak: "break-word" }}>
               {title}
             </Typography>
             {caption && (
-              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.2, mt: 0.25, wordBreak: "break-word" }}>
                 {caption}
               </Typography>
             )}

@@ -1,5 +1,19 @@
-import { useMemo, useState } from "react";
-import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { MemoryRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    const container = document.getElementById("attendance-scroll-container");
+    if (container) {
+      container.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
 import { AttendanceContext, defaultService, type AttendanceState } from "./attendance";
 import { useLoad } from "./components/useLoad";
 import { useWlAttendance } from "./hooks/useWlAttendance";
@@ -39,6 +53,7 @@ function AttendancePanel({ attendance }: { attendance: WlAttendance }) {
   return (
     <AttendanceContext.Provider value={state}>
       <MemoryRouter initialEntries={["/cliente"]}>
+        <ScrollToTop />
         <Routes>
           <Route path="/cliente" element={<Home tab="cliente" />} />
           <Route path="/conexao" element={<Home tab="conexao" />} />

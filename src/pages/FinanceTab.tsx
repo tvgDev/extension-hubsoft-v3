@@ -12,6 +12,7 @@ import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
@@ -296,56 +297,58 @@ function FiscalNotes({ api, clientId }: { api: HubsoftApi; clientId: number }) {
       <LoadState loading={notes.loading} error={notes.error} onRetry={() => void notes.reload()} />
       {notes.data && notes.data.length === 0 && <EmptyState title="Nenhuma nota no período">Tente outro intervalo de datas.</EmptyState>}
       {notes.data && notes.data.length > 0 && (
-        <Table size="small" sx={{ "& th": { fontWeight: 700 }, "& th, & td": { px: 1 } }}>
-          <TableHead>
-            <TableRow>
-              <TableCell>Nota</TableCell>
-              <TableCell>Emissão</TableCell>
-              <TableCell align="right">Valor</TableCell>
-              <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Situação</TableCell>
-              <TableCell align="right">Ações</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {notes.data.map((note) => (
-              <TableRow key={`${note.kind}-${note.id}`} hover>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {note.kindLabel} {note.number}
-                  </Typography>
-                  {note.series && (
-                    <Typography variant="caption" color="text.secondary">
-                      série {note.series}
-                    </Typography>
-                  )}
-                </TableCell>
-                <TableCell sx={{ whiteSpace: "nowrap" }}>{note.issuedAt ?? "—"}</TableCell>
-                <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                  {formatMoney(note.value)}
-                </TableCell>
-                <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
-                  <StatusChip kind="note" status={note.status} />
-                </TableCell>
-                <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                  {note.pdfUrl && (
-                    <Tooltip title="Abrir PDF">
-                      <IconButton size="small" component={Link} href={note.pdfUrl} target="_blank" rel="noopener" aria-label="Abrir PDF da nota">
-                        <PictureAsPdf fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  <Tooltip title="Enviar por e-mail">
-                    <span>
-                      <IconButton size="small" onClick={() => void sendEmail(note)} disabled={sending !== null || note.canceled} aria-label="Enviar nota por e-mail">
-                        <Email fontSize="small" />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                </TableCell>
+        <TableContainer sx={{ overflowX: "auto" }}>
+          <Table size="small" sx={{ minWidth: 320, "& th": { fontWeight: 700 }, "& th, & td": { px: 1 } }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Nota</TableCell>
+                <TableCell>Emissão</TableCell>
+                <TableCell align="right">Valor</TableCell>
+                <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Situação</TableCell>
+                <TableCell align="right">Ações</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHead>
+            <TableBody>
+              {notes.data.map((note) => (
+                <TableRow key={`${note.kind}-${note.id}`} hover>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {note.kindLabel} {note.number}
+                    </Typography>
+                    {note.series && (
+                      <Typography variant="caption" color="text.secondary">
+                        série {note.series}
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>{note.issuedAt ?? "—"}</TableCell>
+                  <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                    {formatMoney(note.value)}
+                  </TableCell>
+                  <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
+                    <StatusChip kind="note" status={note.status} />
+                  </TableCell>
+                  <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                    {note.pdfUrl && (
+                      <Tooltip title="Abrir PDF">
+                        <IconButton size="small" component={Link} href={note.pdfUrl} target="_blank" rel="noopener" aria-label="Abrir PDF da nota">
+                          <PictureAsPdf fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    <Tooltip title="Enviar por e-mail">
+                      <span>
+                        <IconButton size="small" onClick={() => void sendEmail(note)} disabled={sending !== null || note.canceled} aria-label="Enviar nota por e-mail">
+                          <Email fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
     </>
   );

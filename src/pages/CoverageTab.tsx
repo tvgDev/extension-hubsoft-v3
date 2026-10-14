@@ -8,6 +8,7 @@ import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
@@ -142,39 +143,41 @@ function ViabilitySection({ api, address, onChange, onRegister }: { api: Hubsoft
                 ? `Tem cobertura: ${boxes.length} caixa(s) perto do endereço, com ${freePorts} porta(s) livre(s). A mais próxima está a ${boxes[0].distance ?? "poucos metros"}.`
                 : "Há caixas perto do endereço, mas sem portas livres. Vale pedir uma avaliação técnica antes de fechar a venda."}
             </Alert>
-            <Table size="small" sx={{ "& th": { fontWeight: 700 }, "& th, & td": { px: 1 } }}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Caixa</TableCell>
-                  <TableCell>Distância</TableCell>
-                  <TableCell align="right">Livres</TableCell>
-                  <TableCell align="right" sx={{ display: { xs: "none", md: "table-cell" } }}>
-                    Reservadas
-                  </TableCell>
-                  <TableCell align="right">Em uso</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {boxes.map((box, index) => (
-                  <TableRow key={index} hover>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {box.name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {box.project}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{box.distance ?? "—"}</TableCell>
-                    <TableCell align="right">{box.available}</TableCell>
+            <TableContainer sx={{ overflowX: "auto" }}>
+              <Table size="small" sx={{ minWidth: 320, "& th": { fontWeight: 700 }, "& th, & td": { px: 1 } }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Caixa</TableCell>
+                    <TableCell>Distância</TableCell>
+                    <TableCell align="right">Livres</TableCell>
                     <TableCell align="right" sx={{ display: { xs: "none", md: "table-cell" } }}>
-                      {box.reserved}
+                      Reservadas
                     </TableCell>
-                    <TableCell align="right">{box.used}</TableCell>
+                    <TableCell align="right">Em uso</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {boxes.map((box, index) => (
+                    <TableRow key={index} hover>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {box.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {box.project}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{box.distance ?? "—"}</TableCell>
+                      <TableCell align="right">{box.available}</TableCell>
+                      <TableCell align="right" sx={{ display: { xs: "none", md: "table-cell" } }}>
+                        {box.reserved}
+                      </TableCell>
+                      <TableCell align="right">{box.used}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
             {freePorts > 0 && (
               <Button variant="outlined" startIcon={<PersonAdd />} onClick={onRegister} fullWidth>
                 Cadastrar prospecto neste endereço
