@@ -78,5 +78,33 @@ export const theme = createTheme({
     MuiChip: {
       styleOverrides: { root: { fontWeight: 500 } },
     },
+    MuiSelect: {
+      defaultProps: {
+        MenuProps: {
+          slotProps: {
+            paper: {
+              sx: {
+                maxHeight: 280,
+              },
+            },
+          },
+        },
+      },
+    },
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          maxHeight: 280,
+        },
+      },
+    },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          whiteSpace: "normal",
+          wordBreak: "break-word",
+        },
+      },
+    },
   },
 });

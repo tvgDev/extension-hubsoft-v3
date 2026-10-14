@@ -425,6 +425,13 @@ export class HubsoftApi {
     return this.call<RawEnvelope & { atendimento?: RawTicket }>("POST", `${INTEGRATION}/atendimento`, "Não foi possível abrir o chamado no Hubsoft", { body: payload });
   }
 
+  openServiceOrder(ticketId: number) {
+    return this.call<RawEnvelope>("POST", `${INTEGRATION}/ordem_servico/abrir_os`, "Não foi possível abrir a ordem de serviço no Hubsoft", {
+      query: { id_atendimento: ticketId },
+      body: {},
+    });
+  }
+
   addTicketMessage(ticketId: number, message: string) {
     return this.call<RawEnvelope>("POST", `${INTEGRATION}/atendimento/adicionar_mensagem/${ticketId}`, "Não foi possível adicionar a mensagem ao chamado", { body: { mensagem: message } });
   }

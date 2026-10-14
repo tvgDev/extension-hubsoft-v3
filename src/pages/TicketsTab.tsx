@@ -1,4 +1,5 @@
 import Add from "@mui/icons-material/Add";
+import AssignmentOutlined from "@mui/icons-material/AssignmentOutlined";
 import ChatBubbleOutline from "@mui/icons-material/ChatBubbleOutlined";
 import Send from "@mui/icons-material/Send";
 import TaskAlt from "@mui/icons-material/TaskAlt";
@@ -30,6 +31,7 @@ import { phoneDigits } from "../format";
 import type { Service, ServiceOrder, Ticket } from "../model";
 import { addNote, sendToContact } from "../services/attendance";
 import { closeReasons, ticketStatuses, ticketTypes, whatsappOriginId } from "../services/catalog";
+import { errorMessage } from "../services/http";
 import type { HubsoftApi } from "../services/hubsoftApi";
 import { toServiceOrder, toTicket } from "../services/mappers";
 
@@ -218,6 +220,21 @@ function InlineMessage({ onSend }: { onSend: (message: string) => Promise<void> 
 function TicketCard({ ticket, api, onChanged, onClose }: { ticket: Ticket; api: HubsoftApi; onChanged: () => void; onClose: () => void }) {
   const { attendance } = useAttendance();
   const notify = useNotify();
+  const [openingOrder, setOpeningOrder] = useState(false);
+
+  const handleOpenOrder = async () => {
+    setOpeningOrder(true);
+    try {
+      await api.openServiceOrder(ticket.id);
+      await addNote(attendance, `Ordem de Serviço aberta no Hubsoft para o chamado ${ticket.protocol}.`);
+      notify.success("Ordem de Serviço aberta com sucesso");
+      onChanged();
+    } catch (failure) {
+      notify.error(failure);
+    } finally {
+      setOpeningOrder(false);
+    }
+  };
 
   const addMessage = async (message: string) => {
     try {
@@ -295,6 +312,17 @@ function TicketCard({ ticket, api, onChanged, onClose }: { ticket: Ticket; api: 
       {ticket.open && (
         <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", mt: 2, ml: -1, alignItems: "flex-start" }}>
           <InlineMessage onSend={addMessage} />
+          {ticket.orders.length === 0 && (
+            <Button
+              size="small"
+              sx={{ textTransform: "none" }}
+              startIcon={<AssignmentOutlined />}
+              onClick={() => void handleOpenOrder()}
+              disabled={openingOrder}
+            >
+              {openingOrder ? "Abrindo OS…" : "Abrir OS"}
+            </Button>
+          )}
           <Button size="small" sx={{ textTransform: "none" }} startIcon={<TaskAlt />} onClick={onClose}>
             Fechar chamado
           </Button>
@@ -358,6 +386,14 @@ function OrderCard({ order, api }: { order: ServiceOrder; api: HubsoftApi }) {
   );
 }
 
+const SELECT_MENU_PROPS = {
+  slotProps: {
+    paper: {
+      sx: { maxHeight: 280 },
+    },
+  },
+};
+
 function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi; service: Service; onClose: () => void; onCreated: () => void }) {
   const { attendance, data } = useAttendance();
   const notify = useNotify();
@@ -367,6 +403,7 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
   const [typeId, setTypeId] = useState("");
   const [statusId, setStatusId] = useState("");
   const [description, setDescription] = useState("");
+  const [openOrder, setOpenOrder] = useState(true);
   const [notifyClient, setNotifyClient] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -386,12 +423,42 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
         id_origem_contato: origin ?? undefined,
         parametros: { origem: "FOCUS Chat", atendimento_focus_chat: attendance.atendimentoId, whatsapp: attendance.contato.numero },
       });
+      const ticketId = result.atendimento?.id_atendimento;
       const protocol = result.atendimento?.protocolo ? String(result.atendimento.protocolo) : null;
-      await addNote(attendance, protocol ? `Chamado aberto no Hubsoft pelo atendente. Protocolo ${protocol}.` : "Chamado aberto no Hubsoft pelo atendente.");
-      if (notifyClient && protocol) {
-        await sendToContact(attendance, `Seu atendimento foi registrado. Protocolo: ${protocol}. Guarde este número para acompanhar.`);
+
+      let orderOpened = false;
+      if (openOrder && ticketId) {
+        try {
+          await api.openServiceOrder(ticketId);
+          orderOpened = true;
+        } catch (osFailure) {
+          notify.error(
+            `Chamado aberto (protocolo ${protocol ?? "—"}), mas ocorreu uma falha ao abrir a OS: ${errorMessage(osFailure)}`
+          );
+        }
       }
-      notify.success(protocol ? `Chamado aberto. Protocolo ${protocol}` : "Chamado aberto no Hubsoft");
+
+      const note = orderOpened
+        ? protocol
+          ? `Chamado ${protocol} e Ordem de Serviço abertos no Hubsoft pelo atendente.`
+          : "Chamado e Ordem de Serviço abertos no Hubsoft pelo atendente."
+        : protocol
+          ? `Chamado ${protocol} aberto no Hubsoft pelo atendente.`
+          : "Chamado aberto no Hubsoft pelo atendente.";
+      await addNote(attendance, note);
+
+      if (notifyClient && protocol) {
+        const clientMsg = orderOpened
+          ? `Seu atendimento foi registrado e a Ordem de Serviço foi aberta. Protocolo: ${protocol}. Guarde este número para acompanhar.`
+          : `Seu atendimento foi registrado. Protocolo: ${protocol}. Guarde este número para acompanhar.`;
+        await sendToContact(attendance, clientMsg);
+      }
+
+      if (orderOpened) {
+        notify.success(protocol ? `Chamado e OS abertos. Protocolo ${protocol}` : "Chamado e OS abertos no Hubsoft");
+      } else {
+        notify.success(protocol ? `Chamado aberto. Protocolo ${protocol}` : "Chamado aberto no Hubsoft");
+      }
       onCreated();
     } catch (failure) {
       notify.error(failure);
@@ -424,7 +491,15 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
           <LoadState loading={catalogs.loading} error={catalogs.error} onRetry={() => void catalogs.reload()} />
           {catalogs.data && (
             <>
-              <TextField select label="Tipo de atendimento" value={typeId} onChange={(event) => setTypeId(event.target.value)} fullWidth helperText="Sem escolher, o Hubsoft usa o tipo padrão (SAC)">
+              <TextField
+                select
+                label="Tipo de atendimento"
+                value={typeId}
+                onChange={(event) => setTypeId(event.target.value)}
+                fullWidth
+                helperText="Sem escolher, o Hubsoft usa o tipo padrão (SAC)"
+                slotProps={{ select: { MenuProps: SELECT_MENU_PROPS } }}
+              >
                 <MenuItem value="">Padrão do Hubsoft</MenuItem>
                 {catalogs.data.types.map((item) => (
                   <MenuItem key={item.id} value={String(item.id)}>
@@ -438,7 +513,8 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
                 value={statusId}
                 onChange={(event) => setStatusId(event.target.value)}
                 fullWidth
-                helperText="Situações marcadas com (Abertura de OS) já criam uma ordem de serviço"
+                helperText="Opcional. Sem escolher, o Hubsoft usa a situação padrão"
+                slotProps={{ select: { MenuProps: SELECT_MENU_PROPS } }}
               >
                 <MenuItem value="">Padrão do Hubsoft</MenuItem>
                 {catalogs.data.statuses.map((item) => (
@@ -449,6 +525,10 @@ function NewTicketDialog({ api, service, onClose, onCreated }: { api: HubsoftApi
               </TextField>
             </>
           )}
+          <FormControlLabel
+            control={<Checkbox checked={openOrder} onChange={(event) => setOpenOrder(event.target.checked)} />}
+            label="Abrir Ordem de Serviço (OS) vinculada ao chamado"
+          />
           <FormControlLabel
             control={<Checkbox checked={notifyClient} onChange={(event) => setNotifyClient(event.target.checked)} />}
             label="Enviar o número do protocolo pro cliente na conversa"
@@ -496,7 +576,15 @@ function CloseTicketDialog({ api, ticket, onClose, onClosed }: { api: HubsoftApi
         <Stack spacing={3} sx={{ mt: 1 }}>
           <LoadState loading={reasons.loading} error={reasons.error} onRetry={() => void reasons.reload()} />
           {reasons.data && (
-            <TextField select label="Motivo do fechamento" value={reasonId} onChange={(event) => setReasonId(event.target.value)} fullWidth helperText="Sem escolher, o Hubsoft usa o motivo padrão">
+            <TextField
+              select
+              label="Motivo do fechamento"
+              value={reasonId}
+              onChange={(event) => setReasonId(event.target.value)}
+              fullWidth
+              helperText="Sem escolher, o Hubsoft usa o motivo padrão"
+              slotProps={{ select: { MenuProps: SELECT_MENU_PROPS } }}
+            >
               <MenuItem value="">Padrão do Hubsoft</MenuItem>
               {reasons.data.map((item) => (
                 <MenuItem key={item.id} value={String(item.id)}>
