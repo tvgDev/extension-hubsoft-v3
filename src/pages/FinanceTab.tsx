@@ -22,7 +22,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useState, type ReactNode } from "react";
 import { useAttendance } from "../attendance";
-import { EmptyState, LoadState, TabIntro } from "../components/common";
+import { EmptyState, LoadState } from "../components/common";
 import { content, contentTop } from "../components/layout";
 import { OutlinedCard } from "../components/OutlinedCard";
 import { Section } from "../components/Section";
@@ -113,16 +113,16 @@ export function FinanceTab() {
   return (
     <Box sx={content}>
       <Box sx={contentTop}>
-        <TabIntro
-          action={
-            <ToggleButtonGroup size="small" exclusive value={view} onChange={(_event, value: "abertas" | "historico" | null) => value && setView(value)}>
-              <ToggleButton value="abertas">Em aberto</ToggleButton>
-              <ToggleButton value="historico">Histórico</ToggleButton>
-            </ToggleButtonGroup>
-          }
-        >
-          Faturas de {client.name}. Envie o PIX ou o boleto na conversa, ou peça ao Hubsoft para mandar por e-mail ou SMS.
-        </TabIntro>
+        <Stack direction="row" sx={{ mb: 2 }}>
+          <ToggleButtonGroup size="small" exclusive value={view} onChange={(_event, value: "abertas" | "historico" | null) => value && setView(value)}>
+            <ToggleButton value="abertas" sx={{ px: 2 }}>
+              Em aberto
+            </ToggleButton>
+            <ToggleButton value="historico" sx={{ px: 2 }}>
+              Histórico
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
 
         {view === "abertas" && <InvoiceList invoices={data.invoices} emptyTitle="Nenhuma fatura em aberto" emptyText="O cliente está em dia no Hubsoft." {...cardProps} />}
         {view === "historico" && <InvoiceHistory api={api} document={client.document} {...cardProps} />}

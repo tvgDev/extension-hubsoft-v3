@@ -18,7 +18,7 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
 import { useAttendance } from "../attendance";
-import { EmptyState, LoadState, TabIntro } from "../components/common";
+import { EmptyState, LoadState } from "../components/common";
 import { content, contentTop } from "../components/layout";
 import { OutlinedCard } from "../components/OutlinedCard";
 import { Section } from "../components/Section";
@@ -64,26 +64,42 @@ export function TicketsTab() {
   return (
     <Box sx={content}>
       <Box sx={contentTop}>
-        <TabIntro
-          action={
-            <Button variant="contained" startIcon={<Add />} onClick={() => setCreating(true)} disabled={!service} sx={{ whiteSpace: "nowrap" }}>
-              Novo chamado
-            </Button>
-          }
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 1.5,
+            mb: 2.5,
+          }}
         >
-          Chamados de {client.name} no Hubsoft. Ao abrir um, o protocolo pode ir direto pro cliente na conversa.
-        </TabIntro>
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={showAll ? "todos" : "abertos"}
+            onChange={(_event, value: "abertos" | "todos" | null) => value && setShowAll(value === "todos")}
+          >
+            <ToggleButton value="abertos" sx={{ px: 1.5 }}>
+              Abertos
+            </ToggleButton>
+            <ToggleButton value="todos" sx={{ px: 1.5 }}>
+              Todos
+            </ToggleButton>
+          </ToggleButtonGroup>
 
-        <ToggleButtonGroup
-          size="small"
-          exclusive
-          value={showAll ? "todos" : "abertos"}
-          onChange={(_event, value: "abertos" | "todos" | null) => value && setShowAll(value === "todos")}
-          sx={{ mb: 2.5 }}
-        >
-          <ToggleButton value="abertos">Abertos</ToggleButton>
-          <ToggleButton value="todos">Todos</ToggleButton>
-        </ToggleButtonGroup>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<Add />}
+            onClick={() => setCreating(true)}
+            disabled={!service}
+            sx={{ whiteSpace: "nowrap" }}
+          >
+            Novo chamado
+          </Button>
+        </Stack>
 
         <LoadState loading={tickets.loading} error={tickets.error} onRetry={() => void tickets.reload()} />
         {tickets.data && tickets.data.length === 0 && (

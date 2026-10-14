@@ -29,7 +29,7 @@ export function PageShell({ title, back, actions, banner, tabs, subHeader, child
   return (
     <Box
       sx={{
-        height: "100vh",
+        height: { xs: "calc(100vh - 50px)", md: "100vh" },
         display: "flex",
         flexDirection: "column",
         bgcolor: "background.default",
@@ -44,7 +44,7 @@ export function PageShell({ title, back, actions, banner, tabs, subHeader, child
           background: headerGradient,
           color: "#fff",
           flexShrink: 0,
-          height: { xs: 46, md: 54 },
+          height: { xs: 40, md: 54 },
           px: { xs: 1.5, md: 3 },
           display: "flex",
           alignItems: "center",
@@ -112,6 +112,20 @@ export function PageShell({ title, back, actions, banner, tabs, subHeader, child
       >
         <Box sx={{ flex: 1 }}>
           {children}
+        </Box>
+
+        {/* Rodapé de segurança: garante margem limpa no fim da rolagem para nada ser cortado */}
+        <Box
+          sx={{
+            py: 2.5,
+            textAlign: "center",
+            color: "text.disabled",
+            fontSize: "0.75rem",
+            userSelect: "none",
+            flexShrink: 0,
+          }}
+        >
+          Hubsoft · FOCUS Chat
         </Box>
       </Box>
     </Box>
