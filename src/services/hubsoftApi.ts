@@ -1,4 +1,5 @@
 import type { FiscalNoteKind, HubsoftCredentials } from "../model";
+import { defaultEndTime } from "../format";
 import { ApiError, requestJson } from "./http";
 
 // ---------------------------------------------------------------------------
@@ -232,7 +233,9 @@ export interface OpenTicketPayload {
   telefone: string;
   email?: string;
   id_origem_contato?: number;
+  abrir_os?: boolean;
   parametros?: Record<string, string | number>;
+  parametros_ordem_servico?: Record<string, unknown>;
 }
 
 export interface OpenServiceOrderOptions {
@@ -242,6 +245,14 @@ export interface OpenServiceOrderOptions {
   endTime?: string | null;
   orderTypeId?: number | null;
   scheduleId?: number | null;
+}
+
+export interface RescheduleServiceOrderPayload {
+  orderId: number;
+  startDate: string;
+  startTime: string;
+  endDate?: string;
+  endTime?: string;
 }
 
 export interface ViabilityAddress {
@@ -444,17 +455,58 @@ export class HubsoftApi {
     const payload: Record<string, unknown> = {
       id_atendimento: ticketId,
     };
-    if (options?.startDate?.trim()) payload.data_inicio_programado = options.startDate.trim();
-    if (options?.startTime?.trim()) payload.hora_inicio_programado = formatTime(options.startTime);
-    if (options?.endDate?.trim()) payload.data_termino_programado = options.endDate.trim();
-    if (options?.endTime?.trim()) payload.hora_termino_programado = formatTime(options.endTime);
+    if (options?.startDate?.trim()) {
+      const start = options.startDate.trim();
+      const startTime = formatTime(options.startTime) || "08:00:00";
+      const end = options.endDate?.trim() || start;
+      const endTime = formatTime(options.endTime) || defaultEndTime(startTime);
+
+      payload.data_inicio_programado = start;
+      payload.hora_inicio_programado = startTime;
+      payload.data_termino_programado = end;
+      payload.hora_termino_programado = endTime;
+    }
+
     if (options?.orderTypeId) payload.id_tipo_ordem_servico = options.orderTypeId;
     if (options?.scheduleId) payload.id_agenda_ordem_servico = options.scheduleId;
 
-    return this.call<RawEnvelope>("POST", `${INTEGRATION}/ordem_servico/abrir_os`, "Não foi possível abrir a ordem de serviço no Hubsoft", {
-      query: { id_atendimento: ticketId, ...payload },
-      body: payload,
-    });
+    return this.call<RawEnvelope & { ordem_servico?: RawServiceOrder }>(
+      "POST",
+      `${INTEGRATION}/ordem_servico/abrir_os`,
+      "Não foi possível abrir a ordem de serviço no Hubsoft",
+      {
+        query: { id_atendimento: ticketId },
+        body: payload,
+      },
+    );
+  }
+
+  rescheduleServiceOrder(payload: RescheduleServiceOrderPayload) {
+    const formatTime = (time?: string | null) => {
+      if (!time?.trim()) return undefined;
+      const trimmed = time.trim();
+      return trimmed.length === 5 ? `${trimmed}:00` : trimmed;
+    };
+
+    const startTime = formatTime(payload.startTime) || "08:00:00";
+    const endTime = formatTime(payload.endTime) || defaultEndTime(startTime);
+    const startDate = payload.startDate.trim();
+    const endDate = payload.endDate?.trim() || startDate;
+
+    return this.call<RawEnvelope & { ordem_servico?: RawServiceOrder }>(
+      "POST",
+      `${INTEGRATION}/ordem_servico/reagendar`,
+      "Não foi possível agendar a ordem de serviço no Hubsoft",
+      {
+        body: {
+          id_ordem_servico: payload.orderId,
+          data_inicio_programado: startDate,
+          hora_inicio_programado: startTime,
+          data_termino_programado: endDate,
+          hora_termino_programado: endTime,
+        },
+      },
+    );
   }
 
   addTicketMessage(ticketId: number, message: string) {

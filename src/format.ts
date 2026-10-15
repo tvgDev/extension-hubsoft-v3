@@ -38,6 +38,18 @@ export function formatBrDate(isoDateStr: string): string {
   return `${day}/${month}/${year}`;
 }
 
+/** Calcula horário de término padrão (+1h) para agendamento da OS. */
+export function defaultEndTime(startTime: string): string {
+  if (!startTime) return "09:00:00";
+  const [hStr, mStr] = startTime.split(":");
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  const validH = Number.isFinite(h) ? h : 8;
+  const validM = Number.isFinite(m) ? m : 0;
+  const nextH = Math.min(23, validH + 1);
+  return `${String(nextH).padStart(2, "0")}:${String(validM).padStart(2, "0")}:00`;
+}
+
 export function daysAgo(days: number): Date {
   const date = new Date();
   date.setDate(date.getDate() - days);

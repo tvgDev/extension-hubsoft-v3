@@ -23,7 +23,7 @@ import { Section } from "../components/Section";
 import { StatusChip } from "../components/StatusChip";
 import { useNotify } from "../components/useFeedback";
 import { useLoad } from "../components/useLoad";
-import { formatBrDate, isoDate, phoneDigits } from "../format";
+import { defaultEndTime, formatBrDate, isoDate, phoneDigits } from "../format";
 import type { Service, ServiceOrder, Ticket } from "../model";
 import { addNote, sendToContact } from "../services/attendance";
 import { closeReasons, ticketStatuses, ticketTypes, whatsappOriginId } from "../services/catalog";
@@ -450,6 +450,26 @@ function NewTicketView({
 
     setSaving(true);
     try {
+      const formatTime = (time?: string | null) => {
+        if (!time?.trim()) return undefined;
+        const trimmed = time.trim();
+        return trimmed.length === 5 ? `${trimmed}:00` : trimmed;
+      };
+
+      const hasSchedule = Boolean(openOrder && orderStartDate.trim());
+      const startTimeFormatted = formatTime(orderStartTime) || "08:00:00";
+      const endTimeFormatted = formatTime(orderEndTime) || (orderStartTime.trim() ? defaultEndTime(startTimeFormatted) : undefined);
+      const endDateFormatted = (showOrderEnd && orderEndDate.trim()) || orderStartDate.trim() || undefined;
+
+      const orderParams = hasSchedule
+        ? {
+            data_inicio_programado: orderStartDate.trim(),
+            hora_inicio_programado: startTimeFormatted,
+            data_termino_programado: endDateFormatted,
+            hora_termino_programado: endTimeFormatted,
+          }
+        : undefined;
+
       const origin = await whatsappOriginId(api);
       const result = await api.openTicket({
         id_cliente_servico: service.id,
@@ -460,25 +480,50 @@ function NewTicketView({
         telefone: phoneDigits(client.phone) || phoneDigits(attendance.contato.numero),
         email: client.email ?? undefined,
         id_origem_contato: origin ?? undefined,
+        abrir_os: openOrder,
+        parametros_ordem_servico: orderParams,
         parametros: { origem: "FOCUS Chat", atendimento_focus_chat: attendance.atendimentoId, whatsapp: attendance.contato.numero },
       });
       const ticketId = result.atendimento?.id_atendimento;
       const protocol = result.atendimento?.protocolo ? String(result.atendimento.protocolo) : null;
+      const existingOrders = result.atendimento?.ordens_servico ?? [];
 
-      let orderOpened = false;
-      if (openOrder && ticketId) {
-        try {
-          await api.openServiceOrder(ticketId, {
-            startDate: orderStartDate.trim() || undefined,
-            startTime: orderStartTime.trim() || undefined,
-            endDate: (showOrderEnd && orderEndDate.trim()) || undefined,
-            endTime: (showOrderEnd && orderEndTime.trim()) || undefined,
-          });
-          orderOpened = true;
-        } catch (osFailure) {
-          notify.error(
-            `Chamado aberto (protocolo ${protocol ?? "—"}), mas ocorreu uma falha ao abrir a OS: ${errorMessage(osFailure)}`,
-          );
+      let orderOpened = existingOrders.length > 0;
+
+      if (openOrder) {
+        if (existingOrders.length > 0) {
+          // A situação do chamado ou os parâmetros já criaram a OS no Hubsoft.
+          // Se o atendente configurou data/horário, garantimos que o agendamento foi aplicado na OS:
+          if (hasSchedule && existingOrders[0]?.id_ordem_servico) {
+            try {
+              await api.rescheduleServiceOrder({
+                orderId: existingOrders[0].id_ordem_servico,
+                startDate: orderStartDate.trim(),
+                startTime: startTimeFormatted,
+                endDate: endDateFormatted,
+                endTime: endTimeFormatted,
+              });
+            } catch (scheduleErr) {
+              console.warn("Não foi possível reagendar a OS criada automaticamente:", scheduleErr);
+              notify.error(`Chamado e OS criados, mas houve falha ao agendar data/horário: ${errorMessage(scheduleErr)}`);
+            }
+          }
+        } else if (ticketId) {
+          // A situação do chamado não gerou OS automaticamente; abrimos explicitamente via abrir_os:
+          try {
+            await api.openServiceOrder(ticketId, {
+              startDate: orderStartDate.trim() || undefined,
+              startTime: orderStartTime.trim() || undefined,
+              endDate: (showOrderEnd && orderEndDate.trim()) || undefined,
+              endTime: (showOrderEnd && orderEndTime.trim()) || undefined,
+            });
+            orderOpened = true;
+          } catch (osFailure) {
+            console.warn("Falha ao abrir OS via abrir_os:", osFailure);
+            notify.error(
+              `Chamado aberto (protocolo ${protocol ?? "—"}), mas ocorreu uma falha ao abrir a OS: ${errorMessage(osFailure)}`,
+            );
+          }
         }
       }
 
