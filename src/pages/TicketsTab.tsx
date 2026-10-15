@@ -23,7 +23,7 @@ import { Section } from "../components/Section";
 import { StatusChip } from "../components/StatusChip";
 import { useNotify } from "../components/useFeedback";
 import { useLoad } from "../components/useLoad";
-import { phoneDigits } from "../format";
+import { formatBrDate, isoDate, phoneDigits } from "../format";
 import type { Service, ServiceOrder, Ticket } from "../model";
 import { addNote, sendToContact } from "../services/attendance";
 import { closeReasons, ticketStatuses, ticketTypes, whatsappOriginId } from "../services/catalog";
@@ -414,11 +414,40 @@ function NewTicketView({
   const [statusId, setStatusId] = useState("");
   const [description, setDescription] = useState("");
   const [openOrder, setOpenOrder] = useState(true);
+  const [orderStartDate, setOrderStartDate] = useState("");
+  const [orderStartTime, setOrderStartTime] = useState("");
+  const [orderEndDate, setOrderEndDate] = useState("");
+  const [orderEndTime, setOrderEndTime] = useState("");
+  const [showOrderEnd, setShowOrderEnd] = useState(false);
   const [notifyClient, setNotifyClient] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
     if (!client) return;
+
+    if (openOrder) {
+      if (orderStartTime.trim() && !orderStartDate.trim()) {
+        notify.error("Informe a data de início da OS para o horário selecionado.");
+        return;
+      }
+      if (showOrderEnd && orderStartDate.trim() && orderEndDate.trim() && orderEndDate.trim() < orderStartDate.trim()) {
+        notify.error("A data de término não pode ser anterior à data de início.");
+        return;
+      }
+      if (
+        showOrderEnd &&
+        orderStartDate.trim() &&
+        orderEndDate.trim() &&
+        orderStartDate.trim() === orderEndDate.trim() &&
+        orderStartTime.trim() &&
+        orderEndTime.trim() &&
+        orderEndTime.trim() <= orderStartTime.trim()
+      ) {
+        notify.error("O horário de término deve ser posterior ao horário de início.");
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const origin = await whatsappOriginId(api);
@@ -439,7 +468,12 @@ function NewTicketView({
       let orderOpened = false;
       if (openOrder && ticketId) {
         try {
-          await api.openServiceOrder(ticketId);
+          await api.openServiceOrder(ticketId, {
+            startDate: orderStartDate.trim() || undefined,
+            startTime: orderStartTime.trim() || undefined,
+            endDate: (showOrderEnd && orderEndDate.trim()) || undefined,
+            endTime: (showOrderEnd && orderEndTime.trim()) || undefined,
+          });
           orderOpened = true;
         } catch (osFailure) {
           notify.error(
@@ -448,10 +482,17 @@ function NewTicketView({
         }
       }
 
+      let scheduleText = "";
+      if (orderStartDate.trim()) {
+        const dateFormatted = formatBrDate(orderStartDate.trim());
+        const timeFormatted = orderStartTime.trim() ? ` às ${orderStartTime.trim()}` : "";
+        scheduleText = ` (agendada para ${dateFormatted}${timeFormatted})`;
+      }
+
       const note = orderOpened
         ? protocol
-          ? `Chamado ${protocol} e Ordem de Serviço abertos no Hubsoft pelo atendente.`
-          : "Chamado e Ordem de Serviço abertos no Hubsoft pelo atendente."
+          ? `Chamado ${protocol} e Ordem de Serviço abertos no Hubsoft pelo atendente${scheduleText}.`
+          : `Chamado e Ordem de Serviço abertos no Hubsoft pelo atendente${scheduleText}.`
         : protocol
           ? `Chamado ${protocol} aberto no Hubsoft pelo atendente.`
           : "Chamado aberto no Hubsoft pelo atendente.";
@@ -459,7 +500,9 @@ function NewTicketView({
 
       if (notifyClient && protocol) {
         const clientMsg = orderOpened
-          ? `Seu atendimento foi registrado e a Ordem de Serviço foi aberta. Protocolo: ${protocol}. Guarde este número para acompanhar.`
+          ? orderStartDate.trim()
+            ? `Seu atendimento foi registrado e a Ordem de Serviço foi agendada para ${formatBrDate(orderStartDate.trim())}${orderStartTime.trim() ? ` às ${orderStartTime.trim()}` : ""}. Protocolo: ${protocol}. Guarde este número para acompanhar.`
+            : `Seu atendimento foi registrado e a Ordem de Serviço foi aberta. Protocolo: ${protocol}. Guarde este número para acompanhar.`
           : `Seu atendimento foi registrado. Protocolo: ${protocol}. Guarde este número para acompanhar.`;
         await sendToContact(attendance, clientMsg);
       }
@@ -588,16 +631,185 @@ function NewTicketView({
           </>
         )}
 
-        <Stack spacing={1}>
+        <Box sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 1.5, bgcolor: "background.paper" }}>
           <FormControlLabel
             control={<Checkbox checked={openOrder} onChange={(event) => setOpenOrder(event.target.checked)} />}
-            label="Abrir Ordem de Serviço (OS) vinculada ao chamado"
+            label={
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Abrir Ordem de Serviço (OS) vinculada ao chamado
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Gera a OS automaticamente no Hubsoft para a equipe técnica
+                </Typography>
+              </Box>
+            }
+            sx={{ m: 0, alignItems: "flex-start" }}
           />
-          <FormControlLabel
-            control={<Checkbox checked={notifyClient} onChange={(event) => setNotifyClient(event.target.checked)} />}
-            label="Enviar o número do protocolo pro cliente na conversa"
-          />
-        </Stack>
+
+          {openOrder && (
+            <Box
+              sx={{
+                mt: 1.5,
+                pt: 1.5,
+                borderTop: 1,
+                borderColor: "divider",
+              }}
+            >
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between", mb: 1, flexWrap: "wrap", gap: 0.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Início programado da OS
+                </Typography>
+                <Stack direction="row" spacing={0.5}>
+                  <Button
+                    size="small"
+                    variant={orderStartDate === isoDate(new Date()) ? "contained" : "outlined"}
+                    onClick={() => {
+                      const today = isoDate(new Date());
+                      setOrderStartDate(today);
+                      if (showOrderEnd && !orderEndDate) setOrderEndDate(today);
+                    }}
+                    sx={{ fontSize: "0.75rem", py: 0.25, px: 1, minWidth: "auto", textTransform: "none" }}
+                  >
+                    Hoje
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={
+                      orderStartDate ===
+                      (() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 1);
+                        return isoDate(d);
+                      })()
+                        ? "contained"
+                        : "outlined"
+                    }
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + 1);
+                      const tomorrow = isoDate(d);
+                      setOrderStartDate(tomorrow);
+                      if (showOrderEnd && !orderEndDate) setOrderEndDate(tomorrow);
+                    }}
+                    sx={{ fontSize: "0.75rem", py: 0.25, px: 1, minWidth: "auto", textTransform: "none" }}
+                  >
+                    Amanhã
+                  </Button>
+                  {(orderStartDate || orderStartTime || orderEndDate || orderEndTime) && (
+                    <Button
+                      size="small"
+                      color="inherit"
+                      onClick={() => {
+                        setOrderStartDate("");
+                        setOrderStartTime("");
+                        setOrderEndDate("");
+                        setOrderEndTime("");
+                        setShowOrderEnd(false);
+                      }}
+                      sx={{ fontSize: "0.75rem", py: 0.25, px: 1, minWidth: "auto", textTransform: "none", color: "text.secondary" }}
+                    >
+                      Limpar
+                    </Button>
+                  )}
+                </Stack>
+              </Stack>
+
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                <TextField
+                  type="date"
+                  label="Data de início"
+                  value={orderStartDate}
+                  onChange={(event) => {
+                    const newDate = event.target.value;
+                    setOrderStartDate(newDate);
+                    if (showOrderEnd && !orderEndDate) setOrderEndDate(newDate);
+                  }}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  size="small"
+                  fullWidth
+                  helperText="Opcional. Sem data, fica aguardando agendamento"
+                />
+                <TextField
+                  type="time"
+                  label="Horário de início"
+                  value={orderStartTime}
+                  onChange={(event) => {
+                    const newTime = event.target.value;
+                    setOrderStartTime(newTime);
+                    if (newTime && !orderStartDate) {
+                      setOrderStartDate(isoDate(new Date()));
+                    }
+                  }}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  size="small"
+                  fullWidth
+                  helperText="Opcional. Ex: 08:00, 14:00"
+                />
+              </Stack>
+
+              {!showOrderEnd ? (
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => {
+                    setShowOrderEnd(true);
+                    if (orderStartDate && !orderEndDate) setOrderEndDate(orderStartDate);
+                  }}
+                  sx={{ mt: 1, textTransform: "none", fontSize: "0.75rem", p: 0, color: "text.secondary", fontWeight: 600 }}
+                >
+                  + Definir término previsto (opcional)
+                </Button>
+              ) : (
+                <Box sx={{ mt: 1.5, pt: 1.5, borderTop: 1, borderColor: "divider" }}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      Término previsto da OS (opcional)
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={() => {
+                        setShowOrderEnd(false);
+                        setOrderEndDate("");
+                        setOrderEndTime("");
+                      }}
+                      sx={{ fontSize: "0.75rem", p: 0, textTransform: "none", color: "text.secondary" }}
+                    >
+                      Remover término
+                    </Button>
+                  </Stack>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                    <TextField
+                      type="date"
+                      label="Data de término"
+                      value={orderEndDate}
+                      onChange={(event) => setOrderEndDate(event.target.value)}
+                      slotProps={{ inputLabel: { shrink: true } }}
+                      size="small"
+                      fullWidth
+                    />
+                    <TextField
+                      type="time"
+                      label="Horário de término"
+                      value={orderEndTime}
+                      onChange={(event) => setOrderEndTime(event.target.value)}
+                      slotProps={{ inputLabel: { shrink: true } }}
+                      size="small"
+                      fullWidth
+                      helperText="Ex: 11:30, 17:00"
+                    />
+                  </Stack>
+                </Box>
+              )}
+            </Box>
+          )}
+        </Box>
+
+        <FormControlLabel
+          control={<Checkbox checked={notifyClient} onChange={(event) => setNotifyClient(event.target.checked)} />}
+          label="Enviar o número do protocolo pro cliente na conversa"
+        />
 
         <Stack direction="row" spacing={1.5} sx={{ pt: 2, pb: 1, borderTop: 1, borderColor: "divider" }}>
           <Button variant="outlined" onClick={onBack} disabled={saving} sx={{ flex: 1, py: 1.2 }}>

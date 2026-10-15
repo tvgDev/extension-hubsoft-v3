@@ -235,6 +235,15 @@ export interface OpenTicketPayload {
   parametros?: Record<string, string | number>;
 }
 
+export interface OpenServiceOrderOptions {
+  startDate?: string | null;
+  startTime?: string | null;
+  endDate?: string | null;
+  endTime?: string | null;
+  orderTypeId?: number | null;
+  scheduleId?: number | null;
+}
+
 export interface ViabilityAddress {
   endereco: string;
   numero: string;
@@ -425,10 +434,26 @@ export class HubsoftApi {
     return this.call<RawEnvelope & { atendimento?: RawTicket }>("POST", `${INTEGRATION}/atendimento`, "Não foi possível abrir o chamado no Hubsoft", { body: payload });
   }
 
-  openServiceOrder(ticketId: number) {
+  openServiceOrder(ticketId: number, options?: OpenServiceOrderOptions) {
+    const formatTime = (time?: string | null) => {
+      if (!time?.trim()) return undefined;
+      const trimmed = time.trim();
+      return trimmed.length === 5 ? `${trimmed}:00` : trimmed;
+    };
+
+    const payload: Record<string, unknown> = {
+      id_atendimento: ticketId,
+    };
+    if (options?.startDate?.trim()) payload.data_inicio_programado = options.startDate.trim();
+    if (options?.startTime?.trim()) payload.hora_inicio_programado = formatTime(options.startTime);
+    if (options?.endDate?.trim()) payload.data_termino_programado = options.endDate.trim();
+    if (options?.endTime?.trim()) payload.hora_termino_programado = formatTime(options.endTime);
+    if (options?.orderTypeId) payload.id_tipo_ordem_servico = options.orderTypeId;
+    if (options?.scheduleId) payload.id_agenda_ordem_servico = options.scheduleId;
+
     return this.call<RawEnvelope>("POST", `${INTEGRATION}/ordem_servico/abrir_os`, "Não foi possível abrir a ordem de serviço no Hubsoft", {
-      query: { id_atendimento: ticketId },
-      body: {},
+      query: { id_atendimento: ticketId, ...payload },
+      body: payload,
     });
   }
 

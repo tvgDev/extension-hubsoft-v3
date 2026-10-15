@@ -30,6 +30,14 @@ export function isoDate(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+/** Formata YYYY-MM-DD para DD/MM/YYYY. */
+export function formatBrDate(isoDateStr: string): string {
+  if (!isoDateStr) return "";
+  const [year, month, day] = isoDateStr.split("-");
+  if (!year || !month || !day) return isoDateStr;
+  return `${day}/${month}/${year}`;
+}
+
 export function daysAgo(days: number): Date {
   const date = new Date();
   date.setDate(date.getDate() - days);
