@@ -74,6 +74,17 @@ function NowSection({ api, service }: { api: HubsoftApi; service: Service }) {
   // IP pelo qual o roteador do cliente pode ser acessado de fora (quando o provedor libera).
   const routerIp = connection?.lastIp ?? service.ipv4;
 
+  // Abre o painel do roteador em outra aba. Dentro do iframe do FOCUS Chat o
+  // navegador pode bloquear a janela nova; nesse caso o endereço fica copiável.
+  const openRouter = async (url: string) => {
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      notify.error("O navegador bloqueou a nova aba. Copie o endereço abaixo e cole no navegador.");
+      return;
+    }
+    await addNote(attendance, `Painel do roteador aberto pelo atendente (${url}).`).catch(() => undefined);
+  };
+
   const run = async (key: string, title: string, message: string, action: () => Promise<RawEnvelope>, note: string, done: string) => {
     const confirmed = await confirm({ title, message, confirmLabel: "Confirmar" });
     if (!confirmed) return;
@@ -145,20 +156,14 @@ function NowSection({ api, service }: { api: HubsoftApi; service: Service }) {
 
         {routerIp ? (
           <Box>
-            <Button
-              variant="outlined"
-              fullWidth
-              component="a"
-              href={`http://${routerIp}`}
-              target="_blank"
-              rel="noopener"
-              startIcon={<OpenInNew />}
-              onClick={() => void addNote(attendance, `Painel do roteador aberto pelo atendente (http://${routerIp}).`)}
-            >
+            <Button variant="outlined" fullWidth startIcon={<OpenInNew />} onClick={() => void openRouter(`http://${routerIp}`)}>
               Abrir painel do roteador
             </Button>
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
-              Abre http://{routerIp} em outra aba. Só funciona quando o provedor libera o acesso remoto ao roteador nesse IP.
+            <Box sx={{ mt: 1 }}>
+              <InfoItem label="Endereço do painel do roteador" value={`http://${routerIp}`} copy />
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+              Abre em outra aba. Se o painel bloquear, copie o endereço e cole no navegador. Só funciona quando o provedor libera o acesso remoto ao roteador nesse IP.
             </Typography>
           </Box>
         ) : (
