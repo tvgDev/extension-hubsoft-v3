@@ -392,6 +392,13 @@ export class HubsoftApi {
     });
   }
 
+  /** Busca a CPE pelo serial ou MAC (quando a busca por serviço não acha). */
+  listCpesByPhyAddr(phyAddr: string) {
+    return this.call<RawEnvelope & { cpes?: RawCpe[] }>("GET", `${INTEGRATION}/rede/cpe/todos`, "Não foi possível consultar o equipamento do cliente", {
+      query: { pagina: 0, itens_por_pagina: 20, busca: "phy_addr", termo_busca: phyAddr, somente_assinante_associado: "nao" },
+    });
+  }
+
   rebootCpe(phyAddr: string) {
     return this.call<RawEnvelope>("POST", `${INTEGRATION}/rede/reiniciar_cpe/${encodeURIComponent(phyAddr)}`, "Não foi possível reiniciar o equipamento");
   }
