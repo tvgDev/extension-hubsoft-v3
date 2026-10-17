@@ -265,5 +265,7 @@ export interface AttendanceData {
   invoices: Invoice[];
   /** Quantidade de chamados abertos (contador da aba). */
   openTickets: number;
+  /** Porta padrão do painel do roteador, definida pelo provedor na variável 1PortaRoteadorHubsoft. */
+  routerPort: string | null;
   reason: LookupReason | null;
 }

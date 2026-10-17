@@ -3,6 +3,9 @@ import { getContactAttributes, getSystemVariables, sendMedia, sendText, sendWhis
 import { HubsoftApi } from "./hubsoftApi";
 import { toClient, toInvoice } from "./mappers";
 
+/** Variável do sistema (opcional) com a porta padrão do painel do roteador, ex.: 8888. */
+export const ROUTER_PORT_VARIABLE = "1PortaRoteadorHubsoft";
+
 /** Atributo do contato (FOCUS Chat) que guarda o CPF/CNPJ do cliente. */
 export const DOCUMENT_ATTRIBUTE = "CPFCNPJCliente";
 
@@ -62,7 +65,8 @@ export async function loadAttendance(attendance: WlAttendance): Promise<Attendan
   const attributes = await getContactAttributes(attendance.contato.id, attendance.canalId);
   const document = attributes.find((item) => item.Key === DOCUMENT_ATTRIBUTE)?.Value?.trim() || null;
 
-  const base: AttendanceData = { credentials, document, client: null, invoices: [], openTickets: 0, reason: null };
+  const routerPort = variables.find((item) => item.key === ROUTER_PORT_VARIABLE)?.value?.trim() || null;
+  const base: AttendanceData = { credentials, document, client: null, invoices: [], openTickets: 0, routerPort, reason: null };
   if (!credentials) return { ...base, reason: "sem-credenciais" };
   if (!document) return { ...base, reason: "sem-documento" };
 

@@ -13,6 +13,7 @@ import TableCell from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
+import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
 import { useAttendance } from "../attendance";
@@ -64,8 +65,11 @@ export function ConnectionTab() {
   );
 }
 
+// Última porta usada neste navegador, para o atendente não digitar toda vez.
+const ROUTER_PORT_KEY = "hubsoft:porta-roteador";
+
 function NowSection({ api, service }: { api: HubsoftApi; service: Service }) {
-  const { attendance } = useAttendance();
+  const { attendance, data } = useAttendance();
   const notify = useNotify();
   const confirm = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
@@ -73,6 +77,28 @@ function NowSection({ api, service }: { api: HubsoftApi; service: Service }) {
   const chipStatus = connection ? (connection.online ? "conectado" : "desconectado") : null;
   // IP pelo qual o roteador do cliente pode ser acessado de fora (quando o provedor libera).
   const routerIp = connection?.lastIp ?? service.ipv4;
+
+  // Porta do painel: a última usada aqui, senão a padrão do provedor (variável 1PortaRoteadorHubsoft).
+  const [port, setPort] = useState(() => {
+    try {
+      return localStorage.getItem(ROUTER_PORT_KEY) ?? data?.routerPort ?? "";
+    } catch {
+      return data?.routerPort ?? "";
+    }
+  });
+  const changePort = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 5);
+    setPort(digits);
+    try {
+      if (digits) localStorage.setItem(ROUTER_PORT_KEY, digits);
+      else localStorage.removeItem(ROUTER_PORT_KEY);
+    } catch {
+      // sem armazenamento no navegador: só não lembra da porta
+    }
+  };
+  const portNumber = port ? Number(port) : null;
+  const portValid = portNumber === null || (portNumber >= 1 && portNumber <= 65535);
+  const routerUrl = routerIp && portValid ? `http://${routerIp}${port ? `:${port}` : ""}` : null;
 
   // Abre o painel do roteador em outra aba. Dentro do iframe do FOCUS Chat o
   // navegador pode bloquear a janela nova; nesse caso o endereço fica copiável.
@@ -156,14 +182,27 @@ function NowSection({ api, service }: { api: HubsoftApi; service: Service }) {
 
         {routerIp ? (
           <Box>
-            <Button variant="outlined" fullWidth startIcon={<OpenInNew />} onClick={() => void openRouter(`http://${routerIp}`)}>
-              Abrir painel do roteador
-            </Button>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+              <TextField
+                label="Porta"
+                size="small"
+                value={port}
+                onChange={(event) => changePort(event.target.value)}
+                placeholder="80"
+                error={!portValid}
+                helperText={!portValid ? "Entre 1 e 65535" : undefined}
+                sx={{ width: 110, flexShrink: 0 }}
+                slotProps={{ inputLabel: { shrink: true }, htmlInput: { inputMode: "numeric", maxLength: 5 } }}
+              />
+              <Button variant="outlined" fullWidth startIcon={<OpenInNew />} disabled={!routerUrl} onClick={() => routerUrl && void openRouter(routerUrl)} sx={{ height: 40 }}>
+                Abrir painel do roteador
+              </Button>
+            </Stack>
             <Box sx={{ mt: 1 }}>
-              <InfoItem label="Endereço do painel do roteador" value={`http://${routerIp}`} copy />
+              <InfoItem label="Endereço do painel do roteador" value={routerUrl} copy />
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-              Abre em outra aba. Se o painel bloquear, copie o endereço e cole no navegador. Só funciona quando o provedor libera o acesso remoto ao roteador nesse IP.
+              Porta em branco usa a padrão (80). A porta digitada fica guardada para as próximas vezes. Abre em outra aba; se o painel bloquear, copie o endereço e cole no navegador.
             </Typography>
           </Box>
         ) : (

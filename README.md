@@ -41,6 +41,7 @@ Variáveis do sistema:
 | `1UserHubsoft` / `1PassHubsoft` | usuário e senha do Hubsoft |
 | `1CliendIdHubsoft` / `1ClientSecretHubsoft` | credenciais OAuth da integração |
 | `noOpenWidget` | `"false"` para o widget não abrir sozinho ao entrar no atendimento |
+| `1PortaRoteadorHubsoft` | opcional: porta padrão do painel do roteador (ex.: `8888`); o atendente pode trocar na hora |
 
 O CPF/CNPJ do cliente fica no atributo `CPFCNPJCliente` do contato. Quando o
 contato ainda não tem o atributo, o atendente informa o documento na aba
