@@ -1,4 +1,5 @@
 import LinkOff from "@mui/icons-material/LinkOff";
+import OpenInNew from "@mui/icons-material/OpenInNew";
 import Replay from "@mui/icons-material/Replay";
 import RestartAlt from "@mui/icons-material/RestartAlt";
 import Alert from "@mui/material/Alert";
@@ -12,6 +13,7 @@ import TableCell from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
+import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
 import { useAttendance } from "../attendance";
@@ -26,6 +28,7 @@ import { useLoad } from "../components/useLoad";
 import { formatMegabytes } from "../format";
 import type { Service } from "../model";
 import { addNote } from "../services/attendance";
+import { ApiError } from "../services/http";
 import type { HubsoftApi, RawEnvelope } from "../services/hubsoftApi";
 import { toConnectionHistory, toCpe } from "../services/mappers";
 import { signalColor, statusLabel } from "../status";
@@ -62,13 +65,51 @@ export function ConnectionTab() {
   );
 }
 
+// Última porta usada neste navegador, para o atendente não digitar toda vez.
+const ROUTER_PORT_KEY = "hubsoft:porta-roteador";
+
 function NowSection({ api, service }: { api: HubsoftApi; service: Service }) {
-  const { attendance } = useAttendance();
+  const { attendance, data } = useAttendance();
   const notify = useNotify();
   const confirm = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
   const connection = service.connection;
   const chipStatus = connection ? (connection.online ? "conectado" : "desconectado") : null;
+  // IP pelo qual o roteador do cliente pode ser acessado de fora (quando o provedor libera).
+  const routerIp = connection?.lastIp ?? service.ipv4;
+
+  // Porta do painel: a última usada aqui, senão a padrão do provedor (variável 1PortaRoteadorHubsoft).
+  const [port, setPort] = useState(() => {
+    try {
+      return localStorage.getItem(ROUTER_PORT_KEY) ?? data?.routerPort ?? "";
+    } catch {
+      return data?.routerPort ?? "";
+    }
+  });
+  const changePort = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 5);
+    setPort(digits);
+    try {
+      if (digits) localStorage.setItem(ROUTER_PORT_KEY, digits);
+      else localStorage.removeItem(ROUTER_PORT_KEY);
+    } catch {
+      // sem armazenamento no navegador: só não lembra da porta
+    }
+  };
+  const portNumber = port ? Number(port) : null;
+  const portValid = portNumber === null || (portNumber >= 1 && portNumber <= 65535);
+  const routerUrl = routerIp && portValid ? `http://${routerIp}${port ? `:${port}` : ""}` : null;
+
+  // Abre o painel do roteador em outra aba. Dentro do iframe do FOCUS Chat o
+  // navegador pode bloquear a janela nova; nesse caso o endereço fica copiável.
+  const openRouter = async (url: string) => {
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      notify.error("O navegador bloqueou a nova aba. Copie o endereço abaixo e cole no navegador.");
+      return;
+    }
+    await addNote(attendance, `Painel do roteador aberto pelo atendente (${url}).`).catch(() => undefined);
+  };
 
   const run = async (key: string, title: string, message: string, action: () => Promise<RawEnvelope>, note: string, done: string) => {
     const confirmed = await confirm({ title, message, confirmLabel: "Confirmar" });
@@ -138,6 +179,37 @@ function NowSection({ api, service }: { api: HubsoftApi; service: Service }) {
         <Typography variant="caption" color="text.secondary">
           Forçar reconexão derruba a sessão e o roteador volta sozinho. Liberar troca de equipamento serve quando o cliente trocou o roteador ou a ONU.
         </Typography>
+
+        {routerIp ? (
+          <Box>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+              <TextField
+                label="Porta"
+                size="small"
+                value={port}
+                onChange={(event) => changePort(event.target.value)}
+                placeholder="80"
+                error={!portValid}
+                helperText={!portValid ? "Entre 1 e 65535" : undefined}
+                sx={{ width: 110, flexShrink: 0 }}
+                slotProps={{ inputLabel: { shrink: true }, htmlInput: { inputMode: "numeric", maxLength: 5 } }}
+              />
+              <Button variant="outlined" fullWidth startIcon={<OpenInNew />} disabled={!routerUrl} onClick={() => routerUrl && void openRouter(routerUrl)} sx={{ height: 40 }}>
+                Abrir painel do roteador
+              </Button>
+            </Stack>
+            <Box sx={{ mt: 1 }}>
+              <InfoItem label="Endereço do painel do roteador" value={routerUrl} copy />
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+              Porta em branco usa a padrão (80). A porta digitada fica guardada para as próximas vezes. Abre em outra aba; se o painel bloquear, copie o endereço e cole no navegador.
+            </Typography>
+          </Box>
+        ) : (
+          <Typography variant="caption" color="text.secondary">
+            Sem IP atual do cliente, não dá para abrir o painel do roteador. Peça uma reconexão e atualize a leitura.
+          </Typography>
+        )}
       </Stack>
     </Section>
   );
@@ -148,19 +220,51 @@ function CpeSection({ api, service }: { api: HubsoftApi; service: Service }) {
   const notify = useNotify();
   const confirm = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
-  const cpes = useLoad(() => api.listCpes(service.id).then((result) => (result.cpes ?? []).map(toCpe)), String(service.id));
+  // Identificadores do equipamento que o cadastro do serviço já traz (serial e MAC).
+  const serviceIds = [service.phyAddr, service.macAddr].filter((value): value is string => Boolean(value));
 
-  const reboot = async (phyAddr: string) => {
+  // Primeiro pelo serviço; se o Hubsoft não vincula a CPE ao serviço, tenta pelo serial/MAC do cadastro.
+  const cpes = useLoad(async () => {
+    const byService = ((await api.listCpes(service.id)).cpes ?? []).map(toCpe);
+    if (byService.length > 0) return byService;
+    for (const id of serviceIds) {
+      const found = ((await api.listCpesByPhyAddr(id)).cpes ?? []).map(toCpe);
+      if (found.length > 0) return found;
+    }
+    return byService;
+  }, String(service.id));
+
+  const notFound = (failure: unknown) => failure instanceof ApiError && /n[aã]o encontrad/i.test(failure.message);
+
+  /** Tenta reiniciar pelo identificador da CPE e, se o Hubsoft não reconhecer, pelo serial e MAC do serviço. */
+  const reboot = async (primary: string | null) => {
+    const candidates = [primary, ...serviceIds].filter((value, index, all): value is string => Boolean(value) && value !== "—" && all.indexOf(value) === index);
+    if (candidates.length === 0) {
+      notify.error("O Hubsoft não informou serial nem MAC deste equipamento, então não dá para reiniciar por aqui.");
+      return;
+    }
     const confirmed = await confirm({
       title: "Reiniciar o equipamento?",
       message: "A ONU ou o roteador reinicia e o cliente fica sem internet por 1 a 2 minutos.",
       confirmLabel: "Reiniciar",
     });
     if (!confirmed) return;
-    setBusy(phyAddr);
+    setBusy(candidates[0]);
     try {
-      await api.rebootCpe(phyAddr);
-      await addNote(attendance, `Equipamento ${phyAddr} reiniciado pelo atendente.`);
+      let lastFailure: unknown = null;
+      let used: string | null = null;
+      for (const id of candidates) {
+        try {
+          await api.rebootCpe(id);
+          used = id;
+          break;
+        } catch (failure) {
+          lastFailure = failure;
+          if (!notFound(failure)) throw failure;
+        }
+      }
+      if (!used) throw lastFailure ?? new Error("Não foi possível reiniciar o equipamento.");
+      await addNote(attendance, `Equipamento ${used} reiniciado pelo atendente.`);
       notify.success("Comando de reinício enviado. Aguarde 1 a 2 minutos.");
     } catch (failure) {
       notify.error(failure);
@@ -179,8 +283,24 @@ function CpeSection({ api, service }: { api: HubsoftApi; service: Service }) {
       }
     >
       <LoadState loading={cpes.loading} error={cpes.error} onRetry={() => void cpes.reload()} />
-      {cpes.data && cpes.data.length === 0 && (
+      {cpes.data && cpes.data.length === 0 && serviceIds.length === 0 && (
         <EmptyState title="Nenhum equipamento associado">O Hubsoft ainda não encontrou uma ONU ou roteador vinculado a este serviço.</EmptyState>
+      )}
+      {cpes.data && cpes.data.length === 0 && serviceIds.length > 0 && (
+        <OutlinedCard title="Equipamento do cadastro" aside={<StatusChip kind="cpe" status={null} label="Sem leitura" />}>
+          <Typography variant="body2" color="text.secondary">
+            O Hubsoft não devolveu a leitura de sinal deste equipamento, mas o serviço tem serial e MAC cadastrados. Dá para mandar reiniciar mesmo assim.
+          </Typography>
+          <Button variant="contained" startIcon={<RestartAlt />} fullWidth sx={{ mt: 2 }} disabled={busy !== null} onClick={() => void reboot(null)}>
+            {busy !== null ? "Reiniciando…" : "Reiniciar equipamento"}
+          </Button>
+          <Box sx={{ mt: 2.5 }}>
+            <InfoGrid columns={{ xs: "1fr 1fr" }}>
+              <InfoItem label="Serial" value={service.phyAddr} copy />
+              <InfoItem label="MAC" value={service.macAddr} copy />
+            </InfoGrid>
+          </Box>
+        </OutlinedCard>
       )}
       {cpes.data && cpes.data.length > 0 && (
         <Stack spacing={2}>
@@ -198,8 +318,8 @@ function CpeSection({ api, service }: { api: HubsoftApi; service: Service }) {
                   {signal === "error" && "Sinal ruim: problema na fibra ou no conector. Abra um chamado técnico."}
                   {signal === "default" && "Sem leitura de sinal. Toque em Atualizar leitura ou verifique se a ONU está ligada."}
                 </Typography>
-                <Button variant="contained" startIcon={<RestartAlt />} fullWidth sx={{ mt: 2 }} disabled={busy !== null || cpe.phyAddr === "—"} onClick={() => void reboot(cpe.phyAddr)}>
-                  {busy === cpe.phyAddr ? "Reiniciando…" : "Reiniciar equipamento"}
+                <Button variant="contained" startIcon={<RestartAlt />} fullWidth sx={{ mt: 2 }} disabled={busy !== null} onClick={() => void reboot(cpe.phyAddr)}>
+                  {busy !== null ? "Reiniciando…" : "Reiniciar equipamento"}
                 </Button>
                 <Box sx={{ mt: 2.5 }}>
                   <InfoGrid columns={{ xs: "1fr 1fr" }}>
