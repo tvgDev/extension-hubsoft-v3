@@ -37,32 +37,68 @@ const text = (value: unknown): string | null => {
   return trimmed ? trimmed : null;
 };
 
-export function toAddress(raw: RawAddress | null | undefined): Address | null {
+export function toAddress(raw: RawAddress | unknown): Address | null {
   if (!raw) return null;
-  const street = text([raw.logradouro, raw.endereco].filter(Boolean).join(" "));
-  const full = text(raw.completo) ?? [street, raw.numero, raw.bairro, raw.cidade && raw.estado ? `${raw.cidade}/${raw.estado}` : raw.cidade].filter(Boolean).join(", ");
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      const parsed = toAddress(item);
+      if (parsed) return parsed;
+    }
+    return null;
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    return {
+      full: trimmed,
+      street: null,
+      number: null,
+      complement: null,
+      district: null,
+      city: null,
+      state: null,
+      cep: null,
+    };
+  }
+  if (typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const street = text([obj.logradouro, obj.endereco].filter(Boolean).join(" "));
+  const state = text(obj.estado ?? obj.uf);
+  const city = text(obj.cidade);
+  const cityState = city && state ? `${city}/${state}` : city;
+  const full =
+    text(obj.completo) ??
+    text(obj.endereco_completo) ??
+    text(obj.descricao) ??
+    [street, text(obj.numero), text(obj.bairro), cityState].filter(Boolean).join(", ");
   if (!full) return null;
   return {
     full,
     street,
-    number: text(raw.numero),
-    complement: text(raw.complemento),
-    district: text(raw.bairro),
-    city: text(raw.cidade),
-    state: text(raw.estado),
-    cep: text(raw.cep),
+    number: text(obj.numero),
+    complement: text(obj.complemento),
+    district: text(obj.bairro),
+    city,
+    state,
+    cep: text(obj.cep),
   };
 }
 
-function toConnection(raw: RawConnection | null | undefined): Connection | null {
+function toConnection(raw: RawConnection | unknown): Connection | null {
   if (!raw) return null;
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) return null;
+    return toConnection(raw[0]);
+  }
+  if (typeof raw !== "object") return null;
+  const conn = raw as Record<string, unknown>;
   return {
-    online: raw.conectado === true,
-    statusText: text(raw.status_txt_resumido) ?? text(raw.status_txt),
-    lastConnection: text(raw.ultima_conexao),
-    lastDisconnection: text(raw.ultima_desconexao),
-    lastIp: text(raw.ultimo_ipv4),
-    nasIp: text(raw.ultimo_nas_ip),
+    online: conn.conectado === true,
+    statusText: text(conn.status_txt_resumido) ?? text(conn.status_txt),
+    lastConnection: text(conn.ultima_conexao),
+    lastDisconnection: text(conn.ultima_desconexao),
+    lastIp: text(conn.ultimo_ipv4),
+    nasIp: text(conn.ultimo_nas_ip),
   };
 }
 
@@ -82,7 +118,7 @@ export function toService(raw: RawService): Service {
     ipv4: text(raw.ipv4),
     macAddr: text(raw.mac_addr),
     phyAddr: text(raw.phy_addr),
-    installAddress: toAddress(raw.endereco_instalacao),
+    installAddress: toAddress(raw.endereco_instalacao) ?? toAddress((raw as unknown as Record<string, unknown>).endereco) ?? toAddress((raw as unknown as Record<string, unknown>).endereco_padrao),
     connection: toConnection(raw.ultima_conexao),
     olt: text(raw.equipamento_conexao?.nome),
     oltInterface: text(raw.interface?.nome),
@@ -106,6 +142,32 @@ const alertText = (item: unknown): string | null => {
 };
 
 export function toClient(raw: RawClient): HubsoftClient {
+  const rawAny = raw as unknown as Record<string, unknown>;
+  const clientDefaultAddress =
+    toAddress(raw.endereco_padrao) ??
+    toAddress(raw.endereco_instalacao) ??
+    toAddress(rawAny.endereco) ??
+    toAddress(rawAny.enderecos);
+
+  const services = (raw.servicos ?? []).map((s) => {
+    const service = toService(s);
+    if (!service.installAddress && clientDefaultAddress) {
+      service.installAddress = clientDefaultAddress;
+    }
+    return service;
+  });
+
+  const address =
+    clientDefaultAddress ??
+    services.find((s) => s.installAddress)?.installAddress ??
+    null;
+
+  if (address) {
+    for (const s of services) {
+      if (!s.installAddress) s.installAddress = address;
+    }
+  }
+
   return {
     id: raw.id_cliente,
     code: raw.codigo_cliente ?? null,
@@ -114,8 +176,9 @@ export function toClient(raw: RawClient): HubsoftClient {
     personType: text(raw.tipo_pessoa),
     phone: text(raw.telefone_primario),
     email: text(raw.email_principal),
+    address,
     alerts: (raw.alerta_mensagens ?? []).map(alertText).filter((item): item is string => item !== null),
-    services: (raw.servicos ?? []).map(toService),
+    services,
   };
 }
 

@@ -14,6 +14,7 @@ export interface RawEnvelope {
 
 export interface RawAddress {
   completo?: string | null;
+  endereco_completo?: string | null;
   logradouro?: string | null;
   endereco?: string | null;
   numero?: string | null;
@@ -21,6 +22,7 @@ export interface RawAddress {
   bairro?: string | null;
   cidade?: string | null;
   estado?: string | null;
+  uf?: string | null;
   cep?: string | null;
 }
 
@@ -56,7 +58,8 @@ export interface RawService {
   ipv4?: string | null;
   mac_addr?: string | null;
   phy_addr?: string | null;
-  endereco_instalacao?: RawAddress | null;
+  endereco_instalacao?: RawAddress | RawAddress[] | string | null;
+  endereco?: RawAddress | RawAddress[] | string | null;
   ultima_conexao?: RawConnection | null;
   interface?: { nome?: string | null } | null;
   equipamento_conexao?: { nome?: string | null } | null;
@@ -75,6 +78,10 @@ export interface RawClient {
   alerta?: boolean;
   alerta_mensagens?: unknown[] | null;
   servicos?: RawService[] | null;
+  endereco_padrao?: RawAddress | null;
+  endereco_instalacao?: RawAddress | RawAddress[] | string | null;
+  endereco?: RawAddress | RawAddress[] | string | null;
+
 }
 
 export interface RawInvoice {

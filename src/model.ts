@@ -92,6 +92,7 @@ export interface HubsoftClient {
   personType: string | null;
   phone: string | null;
   email: string | null;
+  address: Address | null;
   /** Avisos que o provedor cadastra no Hubsoft para quem atende. */
   alerts: string[];
   services: Service[];

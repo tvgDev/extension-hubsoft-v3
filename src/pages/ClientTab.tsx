@@ -92,6 +92,7 @@ export function ClientTab() {
   };
 
   const serviceStatus = service ? service.statusKey || service.status : null;
+  const clientAddress = service?.installAddress?.full ?? client?.address?.full ?? null;
 
   return (
     <Box sx={content}>
@@ -154,6 +155,7 @@ export function ClientTab() {
               <InfoItem label="Código do cliente" value={client.code} />
               <InfoItem label="Telefone" value={client.phone} />
               <InfoItem label="E-mail" value={client.email} full />
+              <InfoItem label="Endereço completo" value={clientAddress} full copy />
             </InfoGrid>
 
             {service && needsUnlock(serviceStatus) && (
@@ -279,7 +281,7 @@ function ServiceCard({ service, selected, selectable, onSelect }: { service: Ser
         <InfoItem label="Mensalidade" value={formatMoney(service.value)} />
         <InfoItem label="Download / upload" value={speed} />
         <InfoItem label="Tecnologia" value={service.technology} />
-        <InfoItem label="Endereço de instalação" value={service.installAddress?.full} full />
+        <InfoItem label="Endereço completo" value={service.installAddress?.full} full copy />
       </InfoGrid>
 
       {hasSecrets && (
