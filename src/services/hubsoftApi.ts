@@ -373,7 +373,16 @@ export class HubsoftApi {
 
   findClient(document: string) {
     return this.call<RawEnvelope & { clientes?: RawClient[] }>("GET", `${INTEGRATION}/cliente`, "Não foi possível buscar o cliente no Hubsoft", {
-      query: { busca: "cpf_cnpj", termo_busca: document, limit: 1, cancelado: "nao", ultima_conexao: "sim", order_by: "data_cadastro", order_type: "asc" },
+      query: {
+        busca: "cpf_cnpj",
+        termo_busca: document,
+        limit: 1,
+        cancelado: "nao",
+        ultima_conexao: "sim",
+        order_by: "data_cadastro",
+        order_type: "asc",
+        relacoes: "endereco_instalacao",
+      },
     });
   }
 
