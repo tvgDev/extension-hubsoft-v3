@@ -21,6 +21,15 @@ export interface ContactAttribute {
 }
 
 /** Dados de acesso ao Hubsoft, lidos das variáveis do sistema do FOCUS Chat. */
+export interface ContactAddress {
+  street?: string;
+  number?: string;
+  district?: string;
+  city?: string;
+  state?: string;
+  cep?: string;
+}
+
 export interface HubsoftCredentials {
   url: string;
   user: string;
@@ -268,5 +277,9 @@ export interface AttendanceData {
   openTickets: number;
   /** Porta padrão do painel do roteador, definida pelo provedor na variável 1PortaRoteadorHubsoft. */
   routerPort: string | null;
+  /** Endereço prévio salvo nos atributos do contato pelo chatbot. */
+  contactAddress?: ContactAddress | null;
+  /** Lista completa de atributos do contato no FOCUS Chat. */
+  contactAttributes?: ContactAttribute[];
   reason: LookupReason | null;
 }

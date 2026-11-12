@@ -13,7 +13,7 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAttendance } from "../attendance";
 import { TabIntro } from "../components/common";
 import { content, contentTop, fullRow, twoColumns } from "../components/layout";
@@ -22,11 +22,61 @@ import { useNotify } from "../components/useFeedback";
 import { useLoad } from "../components/useLoad";
 import { digitsOnly, formatMoney, phoneDigits } from "../format";
 import type { Plan, Viability } from "../model";
-import { addNote } from "../services/attendance";
+import { addNote, findContactAttr } from "../services/attendance";
 import type { HubsoftApi } from "../services/hubsoftApi";
 import { toPlan, toProspect, toViability } from "../services/mappers";
 
 const STATES = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
+
+const STATE_MAP: Record<string, string> = {
+  acre: "AC",
+  alagoas: "AL",
+  amapa: "AP",
+  amapá: "AP",
+  amazonas: "AM",
+  bahia: "BA",
+  ceara: "CE",
+  ceará: "CE",
+  "distrito federal": "DF",
+  "espirito santo": "ES",
+  "espírito santo": "ES",
+  goias: "GO",
+  goiás: "GO",
+  maranhao: "MA",
+  maranhão: "MA",
+  "mato grosso": "MT",
+  "mato grosso do sul": "MS",
+  "minas gerais": "MG",
+  para: "PA",
+  pará: "PA",
+  paraiba: "PB",
+  paraíba: "PB",
+  parana: "PR",
+  paraná: "PR",
+  pernambuco: "PE",
+  piaui: "PI",
+  piauí: "PI",
+  "rio de janeiro": "RJ",
+  "rio grande do norte": "RN",
+  "rio grande do sul": "RS",
+  rondonia: "RO",
+  rondônia: "RO",
+  roraima: "RR",
+  "santa catarina": "SC",
+  "sao paulo": "SP",
+  "são paulo": "SP",
+  sergipe: "SE",
+  tocantins: "TO",
+};
+
+function normalizeUf(value?: string | null): string {
+  if (!value) return "";
+  const trimmed = value.trim();
+  const upper = trimmed.toUpperCase();
+  if (STATES.includes(upper)) return upper;
+  const lower = trimmed.toLowerCase();
+  return STATE_MAP[lower] ?? "";
+}
 
 /** Endereço digitado uma vez: vale para a consulta de cobertura e para o cadastro do prospecto. */
 interface AddressForm {
@@ -39,8 +89,28 @@ interface AddressForm {
 
 /** Aba Cobertura: para quem ainda não é cliente, viabilidade por endereço, planos por CEP e cadastro de prospecto. */
 export function CoverageTab() {
-  const { attendance, api } = useAttendance();
-  const [address, setAddress] = useState<AddressForm>({ street: "", number: "", district: "", city: "", state: "" });
+  const { attendance, api, data, service } = useAttendance();
+  const contactAddr = data?.contactAddress;
+  const serviceAddr = service?.installAddress;
+
+  const [address, setAddress] = useState<AddressForm>(() => ({
+    street: contactAddr?.street || serviceAddr?.street || "",
+    number: contactAddr?.number || serviceAddr?.number || "",
+    district: contactAddr?.district || serviceAddr?.district || "",
+    city: contactAddr?.city || serviceAddr?.city || "",
+    state: normalizeUf(contactAddr?.state || serviceAddr?.state || ""),
+  }));
+
+  useEffect(() => {
+    if (!contactAddr && !serviceAddr) return;
+    setAddress((prev) => ({
+      street: prev.street || contactAddr?.street || serviceAddr?.street || "",
+      number: prev.number || contactAddr?.number || serviceAddr?.number || "",
+      district: prev.district || contactAddr?.district || serviceAddr?.district || "",
+      city: prev.city || contactAddr?.city || serviceAddr?.city || "",
+      state: prev.state || normalizeUf(contactAddr?.state || serviceAddr?.state || ""),
+    }));
+  }, [contactAddr, serviceAddr]);
   const [prospectOpen, setProspectOpen] = useState(false);
   const prospectRef = useRef<HTMLDivElement>(null);
 
@@ -118,10 +188,10 @@ function ViabilitySection({ api, address, onChange, onRegister }: { api: Hubsoft
       <Stack spacing={2.5}>
         <Box sx={twoColumns}>
           <TextField label="Endereço" value={address.street} onChange={(event) => onChange({ street: event.target.value })} sx={fullRow} placeholder="Rua, avenida…" slotProps={{ inputLabel: { shrink: true } }} />
-          <TextField label="Número" value={address.number} onChange={(event) => onChange({ number: event.target.value })} />
-          <TextField label="Bairro" value={address.district} onChange={(event) => onChange({ district: event.target.value })} />
-          <TextField label="Cidade" value={address.city} onChange={(event) => onChange({ city: event.target.value })} />
-          <TextField select label="UF" value={address.state} onChange={(event) => onChange({ state: event.target.value })}>
+          <TextField label="Número" value={address.number} onChange={(event) => onChange({ number: event.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField label="Bairro" value={address.district} onChange={(event) => onChange({ district: event.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField label="Cidade" value={address.city} onChange={(event) => onChange({ city: event.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField select label="UF" value={address.state} onChange={(event) => onChange({ state: event.target.value })} slotProps={{ inputLabel: { shrink: true } }}>
             {STATES.map((uf) => (
               <MenuItem key={uf} value={uf}>
                 {uf}
@@ -222,19 +292,32 @@ function ProspectSection({
   open: boolean;
   onToggle: (open: boolean) => void;
 }) {
-  const { attendance } = useAttendance();
+  const { attendance, data } = useAttendance();
   const notify = useNotify();
+  const contactAddr = data?.contactAddress;
+  const contactName = attendance.contato.nomeSecundario || (data?.contactAttributes ? findContactAttr(data.contactAttributes, "NomeCliente", "nomeRazao", "nome") : "") || "";
+
   const [form, setForm] = useState<ProspectForm>(() => ({
-    name: attendance.contato.nomeSecundario ?? "",
+    name: contactName,
     phone,
     personType: "pf",
-    document: "",
+    document: data?.document ?? "",
     email: "",
-    cep: "",
+    cep: contactAddr?.cep ?? "",
     complement: "",
     planId: "",
     notes: "",
   }));
+
+  useEffect(() => {
+    if (!contactAddr?.cep && !data?.document && !contactName) return;
+    setForm((prev) => ({
+      ...prev,
+      name: prev.name || contactName || "",
+      cep: prev.cep || contactAddr?.cep || "",
+      document: prev.document || data?.document || "",
+    }));
+  }, [contactAddr?.cep, data?.document, contactName]);
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [saving, setSaving] = useState(false);

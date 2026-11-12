@@ -1,4 +1,4 @@
-import type { AttendanceData, HubsoftClient, HubsoftCredentials, Invoice, SystemVariable, WlAttendance } from "../model";
+import type { AttendanceData, ContactAddress, ContactAttribute, HubsoftClient, HubsoftCredentials, Invoice, SystemVariable, WlAttendance } from "../model";
 import { getContactAttributes, getSystemVariables, sendMedia, sendText, sendWhisper, setContactAttributes } from "./focuschatApi";
 import { HubsoftApi } from "./hubsoftApi";
 import { toClient, toInvoice } from "./mappers";
@@ -28,6 +28,34 @@ function readCredentials(variables: SystemVariable[]): HubsoftCredentials | null
     clientSecret: read(CREDENTIAL_VARIABLES.clientSecret),
   };
   return Object.values(credentials).every(Boolean) ? credentials : null;
+}
+
+/** Busca atributo do contato tolerante a maiúsculas, minúsculas e acentos. */
+export function findContactAttr(attributes: ContactAttribute[], ...keys: string[]): string {
+  const normalizedTargets = keys.map((k) =>
+    k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  );
+  for (const item of attributes) {
+    const rawKey = (item.Key ?? (item as unknown as Record<string, string>).key ?? "").trim();
+    const normalizedKey = rawKey.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (normalizedTargets.includes(normalizedKey)) {
+      const val = (item.Value ?? (item as unknown as Record<string, string>).value ?? "").trim();
+      if (val) return val;
+    }
+  }
+  return "";
+}
+
+/** Extrai dados de endereço preenchidos pelo chatbot nos atributos do contato. */
+export function extractContactAddress(attributes: ContactAttribute[]): ContactAddress {
+  return {
+    street: findContactAttr(attributes, "endereco", "endereço", "logradouro", "rua"),
+    number: findContactAttr(attributes, "numeroCasa", "numerocasa", "numero", "num", "número"),
+    district: findContactAttr(attributes, "bairro"),
+    city: findContactAttr(attributes, "cidade", "municipio", "município"),
+    state: findContactAttr(attributes, "uf", "estado"),
+    cep: findContactAttr(attributes, "cep"),
+  };
 }
 
 export interface Lookup {
@@ -66,7 +94,8 @@ export async function loadAttendance(attendance: WlAttendance): Promise<Attendan
   const document = attributes.find((item) => item.Key === DOCUMENT_ATTRIBUTE)?.Value?.trim() || null;
 
   const routerPort = variables.find((item) => item.key === ROUTER_PORT_VARIABLE)?.value?.trim() || null;
-  const base: AttendanceData = { credentials, document, client: null, invoices: [], openTickets: 0, routerPort, reason: null };
+  const contactAddress = extractContactAddress(attributes);
+  const base: AttendanceData = { credentials, document, client: null, invoices: [], openTickets: 0, routerPort, contactAddress, contactAttributes: attributes, reason: null };
   if (!credentials) return { ...base, reason: "sem-credenciais" };
   if (!document) return { ...base, reason: "sem-documento" };
 
