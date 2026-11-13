@@ -326,10 +326,23 @@ export function toFiscalNotes(raw: RawFiscalNotes): FiscalNote[] {
 }
 
 export function toViability(raw: RawViability): Viability {
+  const projectsRaw = Array.isArray(raw.resultado?.projetos) ? raw.resultado.projetos : [];
+  const projectMsg = typeof raw.resultado?.projetos === "string" ? raw.resultado.projetos.trim() : null;
+  const rawAlerts = Array.isArray(raw.resultado?.alertas)
+    ? raw.resultado.alertas
+    : typeof raw.resultado?.alertas === "string" && raw.resultado.alertas.trim()
+      ? [raw.resultado.alertas.trim()]
+      : [];
+
+  const alerts = rawAlerts.map(alertText).filter((item): item is string => item !== null);
+  if (projectMsg && !alerts.includes(projectMsg)) {
+    alerts.push(projectMsg);
+  }
+
   return {
-    projects: (raw.resultado?.projetos ?? []).map((project) => ({
+    projects: projectsRaw.map((project) => ({
       name: text(project.projeto?.nome) ?? "Projeto",
-      boxes: (project.busca?.elementos?.data ?? []).map((box) => ({
+      boxes: (Array.isArray(project.busca?.elementos?.data) ? project.busca.elementos.data : []).map((box) => ({
         name: text(box.caixa) ?? "Caixa",
         distance: text(box.distancia),
         total: box.total ?? 0,
@@ -338,7 +351,7 @@ export function toViability(raw: RawViability): Viability {
         used: box.utilizadas ?? 0,
       })),
     })),
-    alerts: (raw.resultado?.alertas ?? []).map(alertText).filter((item): item is string => item !== null),
+    alerts,
   };
 }
 

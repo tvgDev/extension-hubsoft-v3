@@ -195,7 +195,7 @@ export interface RawFiscalNotes extends RawEnvelope {
 
 export interface RawViability extends RawEnvelope {
   resultado?: {
-    projetos?: Array<{
+    projetos?: string | Array<{
       projeto?: { nome?: string | null } | null;
       busca?: {
         elementos?: {
@@ -210,7 +210,7 @@ export interface RawViability extends RawEnvelope {
         } | null;
       } | null;
     }> | null;
-    alertas?: unknown[] | null;
+    alertas?: unknown[] | string | null;
   } | null;
 }
 
