@@ -97,8 +97,8 @@ export function CoverageTab() {
     street: contactAddr?.street || serviceAddr?.street || "",
     number: contactAddr?.number || serviceAddr?.number || "",
     district: contactAddr?.district || serviceAddr?.district || "",
-    city: contactAddr?.city || serviceAddr?.city || "",
-    state: normalizeUf(contactAddr?.state || serviceAddr?.state || ""),
+    city: contactAddr?.city || "",
+    state: normalizeUf(contactAddr?.state || ""),
   }));
 
   useEffect(() => {
@@ -107,8 +107,8 @@ export function CoverageTab() {
       street: prev.street || contactAddr?.street || serviceAddr?.street || "",
       number: prev.number || contactAddr?.number || serviceAddr?.number || "",
       district: prev.district || contactAddr?.district || serviceAddr?.district || "",
-      city: prev.city || contactAddr?.city || serviceAddr?.city || "",
-      state: prev.state || normalizeUf(contactAddr?.state || serviceAddr?.state || ""),
+      city: prev.city || contactAddr?.city || "",
+      state: prev.state || normalizeUf(contactAddr?.state || ""),
     }));
   }, [contactAddr, serviceAddr]);
   const [prospectOpen, setProspectOpen] = useState(false);
@@ -192,6 +192,9 @@ function ViabilitySection({ api, address, onChange, onRegister }: { api: Hubsoft
           <TextField label="Bairro" value={address.district} onChange={(event) => onChange({ district: event.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
           <TextField label="Cidade" value={address.city} onChange={(event) => onChange({ city: event.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
           <TextField select label="UF" value={address.state} onChange={(event) => onChange({ state: event.target.value })} slotProps={{ inputLabel: { shrink: true } }}>
+            <MenuItem value="">
+              <em>Selecione</em>
+            </MenuItem>
             {STATES.map((uf) => (
               <MenuItem key={uf} value={uf}>
                 {uf}
