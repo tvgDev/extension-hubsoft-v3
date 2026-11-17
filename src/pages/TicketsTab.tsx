@@ -519,27 +519,14 @@ function NewTicketView({
       let orderOpened = existingOrders.length > 0;
 
       if (openOrder) {
+        let orderIdToSchedule: number | undefined;
+
         if (existingOrders.length > 0) {
-          // A situação do chamado ou os parâmetros já criaram a OS no Hubsoft.
-          // Se o atendente configurou data/horário, garantimos que o agendamento foi aplicado na OS:
-          if (hasSchedule && existingOrders[0]?.id_ordem_servico) {
-            try {
-              await api.rescheduleServiceOrder({
-                orderId: existingOrders[0].id_ordem_servico,
-                startDate: orderStartDate.trim(),
-                startTime: startTimeFormatted,
-                endDate: endDateFormatted,
-                endTime: endTimeFormatted,
-              });
-            } catch (scheduleErr) {
-              console.warn("Não foi possível reagendar a OS criada automaticamente:", scheduleErr);
-              notify.error(`Chamado e OS criados, mas houve falha ao agendar data/horário: ${errorMessage(scheduleErr)}`);
-            }
-          }
+          orderIdToSchedule = existingOrders[0]?.id_ordem_servico;
         } else if (ticketId) {
           // A situação do chamado não gerou OS automaticamente; abrimos explicitamente via abrir_os:
           try {
-            await api.openServiceOrder(ticketId, {
+            const osResult = await api.openServiceOrder(ticketId, {
               startDate: orderStartDate.trim() || undefined,
               startTime: orderStartTime.trim() || undefined,
               endDate: (showOrderEnd && orderEndDate.trim()) || undefined,
@@ -548,11 +535,42 @@ function NewTicketView({
               technicianIds: technicianId ? [Number(technicianId)] : undefined,
             });
             orderOpened = true;
+            orderIdToSchedule = osResult.ordem_servico?.id_ordem_servico;
           } catch (osFailure) {
             console.warn("Falha ao abrir OS via abrir_os:", osFailure);
             notify.error(
               `Chamado aberto (protocolo ${protocol ?? "—"}), mas ocorreu uma falha ao abrir a OS: ${errorMessage(osFailure)}`,
             );
+          }
+        }
+
+        // No Hubsoft, uma nova OS criada via API nasce no status 'aguardando_agendamento' (badge A).
+        // Para que o chamado seja despachado para a fila/aplicativo dos técnicos, o agendamento deve ser confirmado
+        // via rota /ordem_servico/agendar, transitando o status para 'Pendente' (badge P).
+        if (orderIdToSchedule) {
+          try {
+            await api.scheduleServiceOrder(orderIdToSchedule, {
+              startDate: orderStartDate.trim() || undefined,
+              startTime: orderStartTime.trim() || undefined,
+              endDate: (showOrderEnd && orderEndDate.trim()) || undefined,
+              endTime: (showOrderEnd && orderEndTime.trim()) || undefined,
+              technicianIds: technicianId ? [Number(technicianId)] : undefined,
+            });
+          } catch (scheduleErr) {
+            console.warn("Não foi possível confirmar o agendamento da OS (status Pendente):", scheduleErr);
+            if (hasSchedule) {
+              try {
+                await api.rescheduleServiceOrder({
+                  orderId: orderIdToSchedule,
+                  startDate: orderStartDate.trim(),
+                  startTime: startTimeFormatted,
+                  endDate: endDateFormatted,
+                  endTime: endTimeFormatted,
+                });
+              } catch (reagErr) {
+                console.warn("Falha ao reagendar OS:", reagErr);
+              }
+            }
           }
         }
       }

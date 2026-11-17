@@ -255,6 +255,14 @@ export interface OpenServiceOrderOptions {
   technicianIds?: number[] | null;
 }
 
+export interface ScheduleServiceOrderOptions {
+  startDate?: string | null;
+  startTime?: string | null;
+  endDate?: string | null;
+  endTime?: string | null;
+  technicianIds?: number[] | null;
+}
+
 export interface RescheduleServiceOrderPayload {
   orderId: number;
   startDate: string;
@@ -503,6 +511,41 @@ export class HubsoftApi {
         query: { id_atendimento: ticketId },
         body: payload,
       },
+    );
+  }
+
+  scheduleServiceOrder(orderId: number, options?: ScheduleServiceOrderOptions) {
+    const formatTime = (time?: string | null) => {
+      if (!time?.trim()) return undefined;
+      const trimmed = time.trim();
+      return trimmed.length === 5 ? `${trimmed}:00` : trimmed;
+    };
+
+    const payload: Record<string, unknown> = {
+      id_ordem_servico: orderId,
+    };
+
+    if (options?.startDate?.trim()) {
+      const start = options.startDate.trim();
+      const startTime = formatTime(options.startTime) || "08:00:00";
+      const end = options.endDate?.trim() || start;
+      const endTime = formatTime(options.endTime) || defaultEndTime(startTime);
+
+      payload.data_inicio_programado = start;
+      payload.hora_inicio_programado = startTime;
+      payload.data_termino_programado = end;
+      payload.hora_termino_programado = endTime;
+    }
+
+    if (options?.technicianIds && options.technicianIds.length > 0) {
+      payload.tecnicos = options.technicianIds;
+    }
+
+    return this.call<RawEnvelope & { ordem_servico?: RawServiceOrder }>(
+      "POST",
+      `${INTEGRATION}/ordem_servico/agendar`,
+      "Não foi possível confirmar o agendamento da ordem de serviço",
+      { body: payload },
     );
   }
 
