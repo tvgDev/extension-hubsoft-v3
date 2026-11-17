@@ -16,6 +16,22 @@ function remember<T>(key: string, load: () => Promise<T>): Promise<T> {
   return pending;
 }
 
+export const serviceOrderTypes = (api: HubsoftApi) =>
+  remember<CatalogItem[]>(`${api.url}|tipos-ordem-servico`, async () =>
+    ((await api.serviceOrderTypes()).tipo_ordem_servicos ?? []).map((item) => ({
+      id: item.id_tipo_ordem_servico,
+      label: item.descricao ?? `Tipo ${item.id_tipo_ordem_servico}`,
+    })),
+  );
+
+export const technicians = (api: HubsoftApi) =>
+  remember<CatalogItem[]>(`${api.url}|tecnicos`, async () =>
+    ((await api.technicians()).tecnicos ?? []).map((item) => ({
+      id: item.id,
+      label: item.name ?? `Técnico ${item.id}`,
+    })),
+  );
+
 export const ticketTypes = (api: HubsoftApi) =>
   remember<CatalogItem[]>(`${api.url}|tipos-atendimento`, async () =>
     ((await api.ticketTypes()).tipos_atendimento ?? []).map((item) => ({ id: item.id_tipo_atendimento, label: item.descricao ?? `Tipo ${item.id_tipo_atendimento}` })),

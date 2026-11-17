@@ -252,6 +252,7 @@ export interface OpenServiceOrderOptions {
   endTime?: string | null;
   orderTypeId?: number | null;
   scheduleId?: number | null;
+  technicianIds?: number[] | null;
 }
 
 export interface RescheduleServiceOrderPayload {
@@ -492,6 +493,7 @@ export class HubsoftApi {
 
     if (options?.orderTypeId) payload.id_tipo_ordem_servico = options.orderTypeId;
     if (options?.scheduleId) payload.id_agenda_ordem_servico = options.scheduleId;
+    if (options?.technicianIds && options.technicianIds.length > 0) payload.tecnicos = options.technicianIds;
 
     return this.call<RawEnvelope & { ordem_servico?: RawServiceOrder }>(
       "POST",
@@ -553,6 +555,22 @@ export class HubsoftApi {
   }
 
   // ----- Catálogos de configuração -----------------------------------------
+
+  serviceOrderTypes() {
+    return this.call<RawEnvelope & { tipo_ordem_servicos?: Array<{ id_tipo_ordem_servico: number; descricao?: string | null }> }>(
+      "GET",
+      `${INTEGRATION}/configuracao/tipo_ordem_servico`,
+      "Não foi possível carregar os tipos de ordem de serviço",
+    );
+  }
+
+  technicians() {
+    return this.call<RawEnvelope & { tecnicos?: Array<{ id: number; name?: string | null }> }>(
+      "GET",
+      `${INTEGRATION}/configuracao/tecnico`,
+      "Não foi possível carregar os técnicos",
+    );
+  }
 
   ticketTypes() {
     return this.call<RawEnvelope & { tipos_atendimento?: Array<{ id_tipo_atendimento: number; descricao?: string | null }> }>(

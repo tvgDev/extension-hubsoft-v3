@@ -14,7 +14,7 @@ import TextField from "@mui/material/TextField";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAttendance } from "../attendance";
 import { EmptyState, LoadState } from "../components/common";
 import { content, contentTop } from "../components/layout";
@@ -26,7 +26,7 @@ import { useLoad } from "../components/useLoad";
 import { defaultEndTime, formatBrDate, isoDate, phoneDigits } from "../format";
 import type { Service, ServiceOrder, Ticket } from "../model";
 import { addNote, sendToContact } from "../services/attendance";
-import { closeReasons, ticketStatuses, ticketTypes, whatsappOriginId } from "../services/catalog";
+import { closeReasons, serviceOrderTypes, technicians, ticketStatuses, ticketTypes, whatsappOriginId } from "../services/catalog";
 import { errorMessage } from "../services/http";
 import type { HubsoftApi } from "../services/hubsoftApi";
 import { toServiceOrder, toTicket } from "../services/mappers";
@@ -409,7 +409,13 @@ function NewTicketView({
   const { attendance, data } = useAttendance();
   const notify = useNotify();
   const client = data?.client ?? null;
-  const catalogs = useLoad(() => Promise.all([ticketTypes(api), ticketStatuses(api)]).then(([types, statuses]) => ({ types, statuses })));
+  const catalogs = useLoad(() =>
+    Promise.all([ticketTypes(api), ticketStatuses(api), serviceOrderTypes(api), technicians(api)]).then(
+      ([types, statuses, orderTypes, techList]) => ({ types, statuses, orderTypes, technicians: techList }),
+    ),
+  );
+  const [orderTypeId, setOrderTypeId] = useState("");
+  const [technicianId, setTechnicianId] = useState("");
   const [typeId, setTypeId] = useState("");
   const [statusId, setStatusId] = useState("");
   const [description, setDescription] = useState("");
@@ -421,6 +427,22 @@ function NewTicketView({
   const [showOrderEnd, setShowOrderEnd] = useState(false);
   const [notifyClient, setNotifyClient] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const pendingStatus = catalogs.data?.statuses.find((s) => s.opensOrder || s.key === "pendente");
+  const defaultOrderType =
+    catalogs.data?.orderTypes.find((t) => t.label.toUpperCase().includes("SUPORTE")) ?? catalogs.data?.orderTypes[0];
+
+  useEffect(() => {
+    if (defaultOrderType && !orderTypeId) {
+      setOrderTypeId(String(defaultOrderType.id));
+    }
+  }, [defaultOrderType, orderTypeId]);
+
+  useEffect(() => {
+    if (openOrder && pendingStatus && !statusId) {
+      setStatusId(String(pendingStatus.id));
+    }
+  }, [openOrder, pendingStatus, statusId]);
 
   const submit = async () => {
     if (!client) return;
@@ -461,27 +483,33 @@ function NewTicketView({
       const endTimeFormatted = formatTime(orderEndTime) || (orderStartTime.trim() ? defaultEndTime(startTimeFormatted) : undefined);
       const endDateFormatted = (showOrderEnd && orderEndDate.trim()) || orderStartDate.trim() || undefined;
 
-      const orderParams = hasSchedule
-        ? {
-            data_inicio_programado: orderStartDate.trim(),
-            hora_inicio_programado: startTimeFormatted,
-            data_termino_programado: endDateFormatted,
-            hora_termino_programado: endTimeFormatted,
-          }
-        : undefined;
+      const finalStatusId = statusId ? Number(statusId) : openOrder && pendingStatus ? pendingStatus.id : undefined;
+
+      const orderParams: Record<string, unknown> = {
+        ...(hasSchedule
+          ? {
+              data_inicio_programado: orderStartDate.trim(),
+              hora_inicio_programado: startTimeFormatted,
+              data_termino_programado: endDateFormatted,
+              hora_termino_programado: endTimeFormatted,
+            }
+          : {}),
+        ...(orderTypeId ? { id_tipo_ordem_servico: Number(orderTypeId) } : {}),
+        ...(technicianId ? { tecnicos: [Number(technicianId)] } : {}),
+      };
 
       const origin = await whatsappOriginId(api);
       const result = await api.openTicket({
         id_cliente_servico: service.id,
         id_tipo_atendimento: typeId ? Number(typeId) : undefined,
-        id_atendimento_status: statusId ? Number(statusId) : undefined,
+        id_atendimento_status: finalStatusId,
         descricao: description.trim(),
         nome: client.name,
         telefone: phoneDigits(client.phone) || phoneDigits(attendance.contato.numero),
         email: client.email ?? undefined,
         id_origem_contato: origin ?? undefined,
         abrir_os: openOrder,
-        parametros_ordem_servico: orderParams,
+        parametros_ordem_servico: openOrder ? orderParams : undefined,
         parametros: { origem: "FOCUS Chat", atendimento_focus_chat: attendance.atendimentoId, whatsapp: attendance.contato.numero },
       });
       const ticketId = result.atendimento?.id_atendimento;
@@ -516,6 +544,8 @@ function NewTicketView({
               startTime: orderStartTime.trim() || undefined,
               endDate: (showOrderEnd && orderEndDate.trim()) || undefined,
               endTime: (showOrderEnd && orderEndTime.trim()) || undefined,
+              orderTypeId: orderTypeId ? Number(orderTypeId) : undefined,
+              technicianIds: technicianId ? [Number(technicianId)] : undefined,
             });
             orderOpened = true;
           } catch (osFailure) {
@@ -701,6 +731,47 @@ function NewTicketView({
                 borderColor: "divider",
               }}
             >
+              <Stack spacing={2} sx={{ mb: 2 }}>
+                {catalogs.data && catalogs.data.orderTypes.length > 0 && (
+                  <TextField
+                    select
+                    label="Tipo da Ordem de Serviço (OS)"
+                    value={orderTypeId}
+                    onChange={(event) => setOrderTypeId(event.target.value)}
+                    required
+                    fullWidth
+                    helperText="Define a categoria técnica no Hubsoft (ex: Suporte, Instalação, Reparo)"
+                    slotProps={{ select: { MenuProps: SELECT_MENU_PROPS }, inputLabel: { shrink: true } }}
+                  >
+                    {catalogs.data.orderTypes.map((item) => (
+                      <MenuItem key={item.id} value={String(item.id)}>
+                        {item.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+
+                {catalogs.data && catalogs.data.technicians.length > 0 && (
+                  <TextField
+                    select
+                    label="Técnico responsável (opcional)"
+                    value={technicianId}
+                    onChange={(event) => setTechnicianId(event.target.value)}
+                    fullWidth
+                    helperText="Selecione para direcionar direto ao técnico, ou deixe na fila geral"
+                    slotProps={{ select: { MenuProps: SELECT_MENU_PROPS }, inputLabel: { shrink: true } }}
+                  >
+                    <MenuItem value="">Fila técnica (distribuição geral)</MenuItem>
+                    {catalogs.data.technicians
+                      .filter((t) => t.label.toUpperCase() !== "SAC")
+                      .map((item) => (
+                        <MenuItem key={item.id} value={String(item.id)}>
+                          {item.label}
+                        </MenuItem>
+                      ))}
+                  </TextField>
+                )}
+              </Stack>
               <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between", mb: 1, flexWrap: "wrap", gap: 0.5 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5 }}>
                   Início programado da OS
